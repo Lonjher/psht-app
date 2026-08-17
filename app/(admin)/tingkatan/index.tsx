@@ -44,7 +44,7 @@ export default function ListTingkatan() {
       <View className="bg-stone-800 px-5 pb-6 pt-14 dark:bg-stone-900">
         <View className="mb-5 flex-row items-center justify-between">
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

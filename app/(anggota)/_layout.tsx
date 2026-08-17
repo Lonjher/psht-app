@@ -1,18 +1,27 @@
-import { Stack, Redirect } from 'expo-router';
+import { Stack, Redirect, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, ActivityIndicator, useColorScheme } from 'react-native';
+import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function AnggotaLayout() {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
 
   useEffect(() => {
-    AsyncStorage.getItem('role')
-      .then((storedRole) => {
-        setRole(storedRole);
-      })
-      .finally(() => setLoading(false));
+    const restoreSession = async () => {
+      try {
+        const session = await hydrateAuthSession();
+        setAuthToken(session.token);
+        setRole(session.role);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
   if (loading) {
@@ -26,11 +35,58 @@ export default function AnggotaLayout() {
   if (role !== 'ANGGOTA') return <Redirect href="/login" />;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="dashboard" />
-      <Stack.Screen name="profile" />
-      <Stack.Screen name="riwayat-kenaikan/index" />
-      <Stack.Screen name="riwayat-kenaikan/[id]" />
-    </Stack>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#b45309', // amber-700
+        tabBarInactiveTintColor: isDark ? '#78716c' : '#a8a29e', // stone-500 / stone-400
+        tabBarStyle: {
+          backgroundColor: isDark ? '#1c1917' : '#ffffff', // stone-900 / white
+          borderTopColor: isDark ? '#292524' : '#e7e5e4', // stone-800 / stone-200
+          borderTopWidth: 1,
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+      }}>
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="riwayat-kenaikan/index"
+        options={{
+          title: 'Kenaikan',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'trending-up' : 'trending-up-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Sembunyikan halaman detail kenaikan dari tab bar */}
+      <Tabs.Screen name="riwayat-kenaikan/[id]" options={{ href: null }} />
+    </Tabs>
   );
 }

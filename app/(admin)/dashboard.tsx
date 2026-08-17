@@ -9,9 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { setAuthToken } from '@/services/authStore';
+import { clearAuthSession, setAuthToken } from '@/services/authStore';
 import api from '@/services/api';
 
 interface DashboardData {
@@ -52,9 +51,9 @@ export default function AdminDashboard() {
         text: 'Keluar',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.multiRemove(['token', 'role']);
+          await clearAuthSession();
           setAuthToken(null);
-          router.replace('/login');
+          router.replace('/');
         },
       },
     ]);

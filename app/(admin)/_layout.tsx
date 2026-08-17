@@ -1,8 +1,8 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Text, useColorScheme } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 
 export default function AdminLayout() {
   const [role, setRole] = useState<string | null>(null);
@@ -11,9 +11,14 @@ export default function AdminLayout() {
   const isDark = scheme === 'dark';
 
   useEffect(() => {
-    AsyncStorage.getItem('role')
-      .then(setRole)
-      .finally(() => setLoading(false));
+    const restoreSession = async () => {
+      const session = await hydrateAuthSession();
+      setAuthToken(session.token);
+      setRole(session.role);
+      setLoading(false);
+    };
+
+    restoreSession();
   }, []);
 
   if (loading) {

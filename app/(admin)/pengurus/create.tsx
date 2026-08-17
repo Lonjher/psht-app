@@ -1,9 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
+
+const generateNomorAnggota = (existingNumbers: string[]): string => {
+  // Extract numeric part from format PSHT-000000
+  const numbers = existingNumbers
+    .map((num) => {
+      const match = num.match(/PSHT-(\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter((n) => !isNaN(n));
+
+  const nextNumber = (Math.max(...numbers, 0) + 1).toString().padStart(6, '0');
+  return `PSHT-${nextNumber}`;
+};
 
 export default function CreatePengurus() {
   const [form, setForm] = useState({
@@ -15,6 +28,26 @@ export default function CreatePengurus() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const generateNumber = async () => {
+    try {
+      // Get all users (both regular users and pengurus might share nomor_anggota)
+      const res = await api.get('/users');
+      const existingNumbers = (res.data as any[])
+        .map((user) => user.nomor_anggota)
+        .filter((num) => num && typeof num === 'string');
+      const newNumber = generateNomorAnggota(existingNumbers);
+      setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
+    } catch (error) {
+      // Fallback: generate with timestamp if API fails
+      const timestamp = Date.now().toString().slice(-6);
+      setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
+    }
+  };
+
+  useEffect(() => {
+    generateNumber();
+  }, []);
 
   const handleSave = async () => {
     setLoading(true);
@@ -79,17 +112,26 @@ export default function CreatePengurus() {
             onChangeText={(t) => setForm({ ...form, email: t })}
           />
 
-          <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-            NOMOR ANGGOTA <Text className="text-stone-400 dark:text-stone-600">(opsional)</Text>
-          </Text>
-          <TextInput
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-            placeholder="PSHT-000001"
-            placeholderTextColor="#a8a29e"
-            autoCapitalize="characters"
-            value={form.nomor_anggota}
-            onChangeText={(t) => setForm({ ...form, nomor_anggota: t })}
-          />
+          <View className="mb-4 flex-row items-center gap-2">
+            <View className="flex-1">
+              <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
+                NOMOR ANGGOTA
+              </Text>
+              <TextInput
+                className="rounded-xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:border-stone-700 dark:bg-stone-700 dark:text-stone-300"
+                placeholder="PSHT-000001"
+                placeholderTextColor="#a8a29e"
+                autoCapitalize="characters"
+                editable={false}
+                value={form.nomor_anggota}
+              />
+            </View>
+            {/* <TouchableOpacity
+              onPress={generateNumber}
+              className="mt-7 h-11 w-11 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <Ionicons name="refresh" size={20} color="#b45309" />
+            </TouchableOpacity> */}
+          </View>
 
           <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
             PASSWORD

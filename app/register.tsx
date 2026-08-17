@@ -24,6 +24,14 @@ export default function Register() {
   const [success, setSuccess] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
   const handleRegister = async () => {
     setLoading(true);
     setError('');
@@ -70,7 +78,7 @@ export default function Register() {
       {/* Header */}
       <View className="bg-stone-800 px-6 pb-10 pt-16 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mb-8 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Text className="text-white">←</Text>
         </TouchableOpacity>

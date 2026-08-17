@@ -51,7 +51,7 @@ export default function DetailKenaikan() {
   if (!data) {
     return (
       <View className="flex-1 bg-slate-50 px-5 pt-14">
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}>
           <Text className="mb-4 text-sm text-blue-600">← Kembali</Text>
         </TouchableOpacity>
         <Text className="text-lg text-slate-500">Data tidak ditemukan.</Text>
@@ -61,7 +61,7 @@ export default function DetailKenaikan() {
 
   return (
     <View className="flex-1 bg-slate-50 px-5 pt-14">
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}>
         <Text className="mb-4 text-sm text-blue-600">← Kembali</Text>
       </TouchableOpacity>
 

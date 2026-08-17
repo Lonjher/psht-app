@@ -1,8 +1,72 @@
-import { View, Text, ScrollView, Image } from 'react-native';
-import { Link } from 'expo-router';
+import { View, Text, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Link, Redirect, router, useFocusEffect } from 'expo-router';
+import { useEffect, useState, useCallback } from 'react';
+import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 import { Button } from '~/components/ui/button';
+import { SplashScreen } from '~/components/SplashScreen';
 
-export default function Welcome() {
+export default function WelcomeGate() {
+  const [session, setSession] = useState<{ role: string | null; token: string | null } | null>(
+    null
+  );
+  const [isChecking, setIsChecking] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsChecking(true);
+
+      const initSession = async () => {
+        try {
+          const auth = await hydrateAuthSession();
+          setAuthToken(auth.token);
+          setSession({ role: auth.role, token: auth.token });
+        } catch (error) {
+          console.error('Error hydrating session:', error);
+          setSession({ role: null, token: null });
+        } finally {
+          setIsChecking(false);
+        }
+      };
+
+      initSession();
+    }, [])
+  );
+
+  if (isChecking) {
+    return <SplashScreen />;
+  }
+
+  // Selalu tampilkan Welcome page, tidak ada redirect otomatis
+  return <Welcome session={session} />;
+}
+
+function Welcome({ session }: { session: { role: string | null; token: string | null } | null }) {
+  const [authStatus, setAuthStatus] = useState<{ isAuth: boolean; role: string | null }>({
+    isAuth: false,
+    role: null,
+  });
+
+  useEffect(() => {
+    if (session?.token && session?.role) {
+      setAuthStatus({
+        isAuth: true,
+        role: session.role,
+      });
+    } else {
+      setAuthStatus({
+        isAuth: false,
+        role: null,
+      });
+    }
+  }, [session]);
+
+  const handleGoDashboard = () => {
+    if (authStatus.role === 'ADMIN') router.replace('/(admin)/dashboard');
+    else if (authStatus.role === 'PENGURUS') router.replace('/(pengurus)/dashboard');
+    else if (authStatus.role === 'ANGGOTA') router.replace('/(anggota)/dashboard');
+    else router.replace('/login');
+  };
+
   return (
     <ScrollView
       className="flex-1 bg-stone-50 dark:bg-stone-950"
@@ -30,19 +94,37 @@ export default function Welcome() {
           </Text>
 
           <View className="mt-7 w-full gap-3">
-            <Link href="/login" asChild>
-              <Button className="w-full bg-amber-700 active:opacity-90" size="lg">
-                <Text className="font-semibold text-white">Masuk</Text>
-              </Button>
-            </Link>
-            <Link href="/register" asChild>
-              <Button
-                variant="outline"
-                className="w-full border-stone-500 bg-transparent"
-                size="lg">
-                <Text className="font-medium text-stone-100">Daftar Anggota</Text>
-              </Button>
-            </Link>
+            {authStatus.isAuth ? (
+              <>
+                <Button
+                  className="w-full bg-emerald-700 active:opacity-90"
+                  size="lg"
+                  onPress={handleGoDashboard}>
+                  <Text className="font-semibold text-white">Ke Dashboard</Text>
+                </Button>
+                <TouchableOpacity
+                  onPress={() => router.replace('/login')}
+                  className="items-center py-2">
+                  <Text className="text-sm font-medium text-stone-300">Ganti Akun</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Link href="/login" asChild>
+                  <Button className="w-full bg-amber-700 active:opacity-90" size="lg">
+                    <Text className="font-semibold text-white">Masuk</Text>
+                  </Button>
+                </Link>
+                <Link href="/register" asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full border-stone-500 bg-transparent"
+                    size="lg">
+                    <Text className="font-medium text-stone-100">Daftar Anggota</Text>
+                  </Button>
+                </Link>
+              </>
+            )}
           </View>
         </View>
       </View>

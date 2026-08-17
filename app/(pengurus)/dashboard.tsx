@@ -1,10 +1,10 @@
 import { View, Text, ActivityIndicator, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { setAuthToken } from '@/services/authStore';
+import { clearAuthSession, setAuthToken } from '@/services/authStore';
 import api from '@/services/api';
+import { WithTabs } from '~/components/WithTabs';
 
 interface DashboardData {
   total_anggota_aktif: number;
@@ -33,9 +33,9 @@ export default function PengurusDashboard() {
         text: 'Keluar',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.multiRemove(['token', 'role']);
+          await clearAuthSession();
           setAuthToken(null);
-          router.replace('/login');
+          router.replace('/');
         },
       },
     ]);
@@ -70,7 +70,7 @@ export default function PengurusDashboard() {
       </View>
 
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-5 pt-8"
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-10">
         {/* Stats */}

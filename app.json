@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "psht-app",
+    "name": "PSHT App",
     "slug": "psht-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "psht-app",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
@@ -14,15 +14,13 @@
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+      "adaptiveIcon": {},
+      "package": "com.lonjher.pshtapp"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
@@ -30,15 +28,21 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "resizeMode": "contain"
         }
       ],
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a07d9797-e6b7-4242-87a2-0c370fd0f1d5"
+      }
     }
   }
 }

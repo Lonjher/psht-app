@@ -51,7 +51,7 @@ export default function EditUser() {
     try {
       await api.put(`/users/${id}`, form);
       Alert.alert('Berhasil', 'Data anggota diperbarui');
-      router.back();
+      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
     } finally {
@@ -83,7 +83,7 @@ export default function EditUser() {
           try {
             await api.delete(`/users/${id}`);
             Alert.alert('Dihapus', 'Data anggota berhasil dihapus');
-            router.back();
+            if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
           } finally {
@@ -121,7 +121,7 @@ export default function EditUser() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>

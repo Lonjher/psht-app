@@ -7,11 +7,14 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
+import { WithTabs } from '~/components/WithTabs';
 
 interface ProfileData {
   name: string;
@@ -29,6 +32,7 @@ export default function Profile() {
   const [form, setForm] = useState({ name: '', no_hp: '', alamat: '', tanggal_lahir: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     api
@@ -61,6 +65,12 @@ export default function Profile() {
     }
   };
 
+  const onDateChange = (_event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate ?? new Date();
+    const isoDate = currentDate.toISOString().split('T')[0];
+    setForm((prev) => ({ ...prev, tanggal_lahir: isoDate }));
+  };
+
   const getInitials = (name?: string) =>
     (name ?? '?')
       .split(' ')
@@ -76,7 +86,6 @@ export default function Profile() {
       </View>
     );
   }
-
   return (
     <ScrollView
       className="flex-1 bg-stone-50 dark:bg-stone-950"
@@ -85,7 +94,13 @@ export default function Profile() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/');
+          }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>
@@ -165,13 +180,26 @@ export default function Profile() {
             />
 
             <FieldLabel text="TANGGAL LAHIR" />
-            <TextInput
-              className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#a8a29e"
-              value={form.tanggal_lahir}
-              onChangeText={(t) => setForm({ ...form, tanggal_lahir: t })}
-            />
+            <TouchableOpacity
+              className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+              onPress={() => setShowDatePicker(true)}>
+              <Text
+                className={`text-sm ${
+                  form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                }`}>
+                {form.tanggal_lahir || 'Pilih tanggal lahir'}
+              </Text>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={form.tanggal_lahir ? new Date(form.tanggal_lahir) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onValueChange={onDateChange}
+                onDismiss={() => setShowDatePicker(false)}
+              />
+            )}
 
             <View className="flex-row gap-3">
               <TouchableOpacity

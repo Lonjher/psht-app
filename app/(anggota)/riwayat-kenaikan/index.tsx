@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
@@ -65,7 +65,13 @@ export default function RiwayatKenaikan() {
   return (
     <View className="flex-1 bg-stone-50 px-5 pt-14 dark:bg-stone-950">
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+          router.replace('/');
+        }}
         className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-stone-200 dark:bg-stone-800">
         <Ionicons name="chevron-back" size={18} color="#78716c" />
       </TouchableOpacity>

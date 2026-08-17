@@ -1,18 +1,24 @@
-import { Stack, Redirect } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, ActivityIndicator, useColorScheme } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 
 export default function PengurusLayout() {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
 
   useEffect(() => {
-    AsyncStorage.getItem('role')
-      .then((storedRole) => {
-        setRole(storedRole);
-      })
-      .finally(() => setLoading(false));
+    const restoreSession = async () => {
+      const session = await hydrateAuthSession();
+      setAuthToken(session.token);
+      setRole(session.role);
+      setLoading(false);
+    };
+
+    restoreSession();
   }, []);
 
   if (loading) {
@@ -26,17 +32,72 @@ export default function PengurusLayout() {
   if (role !== 'PENGURUS') return <Redirect href="/login" />;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="dashboard" />
-      <Stack.Screen name="users/index" />
-      <Stack.Screen name="users/create" />
-      <Stack.Screen name="users/[id]/index" />
-      <Stack.Screen name="tingkatan/index" />
-      <Stack.Screen name="tingkatan/create" />
-      <Stack.Screen name="tingkatan/[id]/index" />
-      <Stack.Screen name="kenaikan/index" />
-      <Stack.Screen name="kenaikan/create" />
-      <Stack.Screen name="kenaikan/[id]/index" />
-    </Stack>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#b45309', // amber-700
+        tabBarInactiveTintColor: isDark ? '#78716c' : '#a8a29e', // stone-500 / stone-400
+        tabBarStyle: {
+          backgroundColor: isDark ? '#1c1917' : '#ffffff', // stone-900 / white
+          borderTopColor: isDark ? '#292524' : '#e7e5e4', // stone-800 / stone-200
+          borderTopWidth: 1,
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+      }}>
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="users/index"
+        options={{
+          title: 'Anggota',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="tingkatan/index"
+        options={{
+          title: 'Tingkatan',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'layers' : 'layers-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="kenaikan/index"
+        options={{
+          title: 'Kenaikan',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'trending-up' : 'trending-up-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* Sembunyikan halaman create/detail dari tab bar */}
+      <Tabs.Screen name="users/create" options={{ href: null }} />
+      <Tabs.Screen name="users/[id]/index" options={{ href: null }} />
+      <Tabs.Screen name="tingkatan/create" options={{ href: null }} />
+      <Tabs.Screen name="tingkatan/[id]/index" options={{ href: null }} />
+      <Tabs.Screen name="kenaikan/create" options={{ href: null }} />
+      <Tabs.Screen name="kenaikan/[id]/index" options={{ href: null }} />
+    </Tabs>
   );
 }

@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setAuthToken } from '@/services/authStore';
+import { setAuthSession, setAuthToken } from '@/services/authStore';
 import api from '../services/api';
 import { Button } from '~/components/ui/button';
 
 export default function Login() {
   const [email, setEmail] = useState<string>('');
+  const [res, setRes] = useState<any>(null);
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -21,23 +29,10 @@ export default function Login() {
       const token = res.data.token;
       const role = res.data.user.role.kode_role;
 
-      // Simpan token & role
-      await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('role', role);
+      await setAuthSession(token, role);
+      setAuthToken(token);
 
-      // Verifikasi token tersimpan
-      const storedToken = await AsyncStorage.getItem('token');
-      // Set token in auth store
-      setAuthToken(res.data.token);
-
-      if (!storedToken) {
-        setError('Gagal menyimpan sesi. Coba lagi.');
-        setLoading(false);
-        return;
-      }
-
-      // Jeda kecil untuk memastikan AsyncStorage siap
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       if (role === 'ADMIN') router.replace({ pathname: '/(admin)/dashboard' });
       else if (role === 'PENGURUS') router.replace({ pathname: '/(pengurus)/dashboard' });
@@ -57,7 +52,7 @@ export default function Login() {
       {/* Header */}
       <View className="bg-stone-800 px-6 pb-10 pt-16 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="mb-8 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Text className="text-white">←</Text>
         </TouchableOpacity>

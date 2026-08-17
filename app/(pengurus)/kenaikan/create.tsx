@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  useColorScheme,
+} from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 
 interface UserOption {
   id: number;
   name: string;
+  nomor_anggota?: string;
 }
 interface TingkatanOption {
   id: number;
@@ -21,6 +32,7 @@ export default function CreateKenaikan() {
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [selectedTingkatan, setSelectedTingkatan] = useState<number | null>(null);
   const [tanggal, setTanggal] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [status, setStatus] = useState('proses');
   const [nilai, setNilai] = useState({
     tes_tulis: '',
@@ -30,6 +42,7 @@ export default function CreateKenaikan() {
   });
   const [catatan, setCatatan] = useState('');
   const [loading, setLoading] = useState(false);
+  const isDark = useColorScheme() === 'dark';
 
   useEffect(() => {
     api.get('/users?status=aktif').then((res) => setUsers(res.data));
@@ -57,12 +70,22 @@ export default function CreateKenaikan() {
         catatan,
       });
       Alert.alert('Berhasil', 'Data kenaikan disimpan');
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const onDateChange = (_event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate ?? new Date();
+    const isoDate = currentDate.toISOString().split('T')[0];
+    setTanggal(isoDate);
   };
 
   return (
@@ -73,7 +96,13 @@ export default function CreateKenaikan() {
       {/* Header */}
       <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/');
+          }}
           className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>
@@ -96,11 +125,15 @@ export default function CreateKenaikan() {
             <Picker
               selectedValue={selectedUser}
               onValueChange={setSelectedUser}
-              style={{ color: '#1c1917' }}
-              dropdownIconColor="#78716c">
+              style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
+              dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
               <Picker.Item label="Pilih Anggota..." value={null} />
               {users.map((u) => (
-                <Picker.Item key={u.id} label={u.name} value={u.id} />
+                <Picker.Item
+                  key={u.id}
+                  label={u.nomor_anggota ? `${u.nomor_anggota} - ${u.name}` : u.name}
+                  value={u.id}
+                />
               ))}
             </Picker>
           </View>
@@ -110,8 +143,8 @@ export default function CreateKenaikan() {
             <Picker
               selectedValue={selectedTingkatan}
               onValueChange={setSelectedTingkatan}
-              style={{ color: '#1c1917' }}
-              dropdownIconColor="#78716c">
+              style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
+              dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
               <Picker.Item label="Pilih Tingkatan..." value={null} />
               {tingkatans.map((t) => (
                 <Picker.Item key={t.id} label={t.nama_tingkatan} value={t.id} />
@@ -120,13 +153,25 @@ export default function CreateKenaikan() {
           </View>
 
           <FieldLabel text="TANGGAL KENAIKAN" />
-          <TextInput
-            className="mb-1 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#a8a29e"
-            value={tanggal}
-            onChangeText={setTanggal}
-          />
+          <TouchableOpacity
+            className="mb-1 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+            onPress={() => setShowDatePicker(true)}>
+            <Text
+              className={`text-sm ${
+                tanggal ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+              }`}>
+              {tanggal || 'Pilih tanggal kenaikan'}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={tanggal ? new Date(tanggal) : new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onValueChange={onDateChange}
+              onDismiss={() => setShowDatePicker(false)}
+            />
+          )}
         </View>
 
         {/* Nilai */}
@@ -178,8 +223,8 @@ export default function CreateKenaikan() {
             <Picker
               selectedValue={status}
               onValueChange={setStatus}
-              style={{ color: '#1c1917' }}
-              dropdownIconColor="#78716c">
+              style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
+              dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
               <Picker.Item label="Proses" value="proses" />
               <Picker.Item label="Lulus" value="lulus" />
               <Picker.Item label="Tidak Lulus" value="tidak_lulus" />
