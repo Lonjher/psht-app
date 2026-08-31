@@ -108,6 +108,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="tingkatan/[id]/index" options={{ href: null }} />
       <Tabs.Screen name="kenaikan/create" options={{ href: null }} />
       <Tabs.Screen name="kenaikan/[id]/index" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }

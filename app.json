@@ -4,12 +4,10 @@
     "slug": "psht-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "psht-app",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
@@ -33,10 +31,19 @@
       ],
       "expo-status-bar",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "reactNativeAndroidArchitectures": "armeabi-v7a,arm64-v8a"
+          }
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": false
     },
     "extra": {
       "router": {},

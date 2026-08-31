@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditUser() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,28 +24,37 @@ export default function EditUser() {
     nomor_anggota: '',
     no_hp: '',
     alamat: '',
+    tanggal_lahir: '', // tambahkan
     status: '',
   });
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const fetchUser = async () => {
+    try {
+      const res = await api.get(`/users/${id}`);
+      const u = res.data;
+      setForm({
+        name: u.name,
+        email: u.email,
+        nomor_anggota: u.nomor_anggota ?? '',
+        no_hp: u.no_hp ?? '',
+        alamat: u.alamat ?? '',
+        tanggal_lahir: u.tanggal_lahir ?? '', // tambahkan
+        status: u.status,
+      });
+    } catch (e) {
+      Alert.alert('Gagal', 'Gagal memuat data anggota');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    api
-      .get(`/users/${id}`)
-      .then((res) => {
-        const u = res.data;
-        setForm({
-          name: u.name,
-          email: u.email,
-          nomor_anggota: u.nomor_anggota ?? '',
-          no_hp: u.no_hp ?? '',
-          alamat: u.alamat ?? '',
-          status: u.status,
-        });
-      })
-      .finally(() => setLoading(false));
+    fetchUser();
   }, [id]);
 
   const handleUpdate = async () => {
@@ -51,7 +62,11 @@ export default function EditUser() {
     try {
       await api.put(`/users/${id}`, form);
       Alert.alert('Berhasil', 'Data anggota diperbarui');
-      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
     } finally {
@@ -63,8 +78,8 @@ export default function EditUser() {
     setApproving(true);
     try {
       await api.patch(`/users/${id}/approve`);
-      Alert.alert('Disetujui', 'Anggota sekarang aktif');
-      setForm({ ...form, status: 'aktif' });
+      await fetchUser(); // ambil data terbaru, termasuk nomor_anggota
+      Alert.alert('Disetujui', 'Anggota sekarang aktif dan nomor anggota telah dibuat');
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Gagal menyetujui');
     } finally {
@@ -83,7 +98,11 @@ export default function EditUser() {
           try {
             await api.delete(`/users/${id}`);
             Alert.alert('Dihapus', 'Data anggota berhasil dihapus');
-            if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
           } finally {
@@ -92,6 +111,19 @@ export default function EditUser() {
         },
       },
     ]);
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (selectedDate) {
+        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+      }
+    } else {
+      if (selectedDate) {
+        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+      }
+    }
   };
 
   const getInitials = (name: string) =>
@@ -121,7 +153,13 @@ export default function EditUser() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/');
+          }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>
@@ -151,7 +189,7 @@ export default function EditUser() {
       {/* Approve Banner */}
       {isPending && (
         <View className="px-5">
-          <View className="-mt-4 flex-row items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
+          <View className="-mt-5 flex-row items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
             <View className="h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
               <Ionicons name="time-outline" size={18} color="#b45309" />
             </View>
@@ -177,8 +215,8 @@ export default function EditUser() {
       )}
 
       {/* Form Card */}
-      <View className="flex-1 px-5">
-        <View className="-mt-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+      <View className="z-10 flex-1 px-5">
+        <View className="mt-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
           <Text className="mb-4 text-sm font-bold text-stone-800 dark:text-stone-100">
             Edit Data Anggota
           </Text>
@@ -214,6 +252,27 @@ export default function EditUser() {
             value={form.no_hp}
             onChangeText={(t) => setForm({ ...form, no_hp: t })}
           />
+
+          <FieldLabel text="TANGGAL LAHIR" />
+          <TouchableOpacity
+            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+            onPress={() => setShowDatePicker(true)}>
+            <Text
+              className={`text-sm ${
+                form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+              }`}>
+              {form.tanggal_lahir || 'Pilih tanggal lahir'}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.tanggal_lahir ? new Date(form.tanggal_lahir) : new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onValueChange={onDateChange}
+              onDismiss={() => setShowDatePicker(false)}
+            />
+          )}
 
           <FieldLabel text="ALAMAT" />
           <TextInput

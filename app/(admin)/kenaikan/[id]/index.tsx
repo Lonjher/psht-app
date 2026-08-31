@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  useColorScheme,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -37,6 +38,7 @@ export default function EditKenaikan() {
   const [form, setForm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const isDark = useColorScheme() === 'dark';
 
   useEffect(() => {
     api
@@ -73,7 +75,11 @@ export default function EditKenaikan() {
         },
       });
       Alert.alert('Berhasil', 'Data kenaikan diperbarui');
-      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
@@ -105,7 +111,13 @@ export default function EditKenaikan() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/');
+          }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>
@@ -156,12 +168,12 @@ export default function EditKenaikan() {
           />
 
           <FieldLabel text="STATUS" />
-          <View className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800">
+          <View className="mb-1 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800">
             <Picker
               selectedValue={form.status}
               onValueChange={(v) => setForm({ ...form, status: v })}
-              style={{ color: '#1c1917' }}
-              dropdownIconColor="#78716c">
+              style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
+              dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
               <Picker.Item label="Proses" value="proses" />
               <Picker.Item label="Lulus" value="lulus" />
               <Picker.Item label="Tidak Lulus" value="tidak_lulus" />
