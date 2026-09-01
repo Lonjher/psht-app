@@ -7,25 +7,39 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditPengurus() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [form, setForm] = useState({ name: '', email: '', no_hp: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    no_hp: '',
+    tanggal_lahir: '', // tambahan
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => {
     api
       .get(`/pengurus/${id}`)
       .then((res) => {
         const u = res.data;
-        setForm({ name: u.name, email: u.email, no_hp: u.no_hp ?? '' });
+        setForm({
+          name: u.name,
+          email: u.email,
+          no_hp: u.no_hp ?? '',
+          tanggal_lahir: u.tanggal_lahir ?? '', // tambahan
+        });
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -35,12 +49,58 @@ export default function EditPengurus() {
     try {
       await api.put(`/pengurus/${id}`, form);
       Alert.alert('Berhasil', 'Data pengurus diperbarui');
-      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    if (!form.tanggal_lahir) {
+      Alert.alert(
+        'Perhatian',
+        'Tanggal lahir belum diisi. Isi terlebih dahulu sebelum mereset password.'
+      );
+      return;
+    }
+
+    // Format DDMMYYYY dari YYYY-MM-DD
+    const [year, month, day] = form.tanggal_lahir.split('-');
+    const defaultPassword = `${day}${month}${year}`;
+
+    Alert.alert(
+      'Reset Password',
+      `Password akan direset ke format tanggal lahir (DDMMYYYY): ${defaultPassword}`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: async () => {
+            setResettingPassword(true);
+            try {
+              // Sesuaikan endpoint reset password untuk pengurus
+              await api.patch(`/pengurus/${id}/reset-password`, {
+                password: defaultPassword,
+              });
+              Alert.alert('Berhasil', `Password telah direset ke ${defaultPassword}`);
+            } catch (e: any) {
+              Alert.alert(
+                'Gagal',
+                e.response?.data?.message ?? 'Terjadi kesalahan saat mereset password'
+              );
+            } finally {
+              setResettingPassword(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDelete = () => {
@@ -54,7 +114,11 @@ export default function EditPengurus() {
           try {
             await api.delete(`/pengurus/${id}`);
             Alert.alert('Dihapus', 'Data pengurus berhasil dihapus');
-            if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
           } finally {
@@ -63,6 +127,19 @@ export default function EditPengurus() {
         },
       },
     ]);
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (selectedDate) {
+        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+      }
+    } else {
+      if (selectedDate) {
+        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+      }
+    }
   };
 
   const getInitials = (name: string) =>
@@ -89,7 +166,13 @@ export default function EditPengurus() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/');
+          }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>
@@ -139,13 +222,36 @@ export default function EditPengurus() {
             NO HP
           </Text>
           <TextInput
-            className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
             placeholder="08xxxxxxxxxx"
             placeholderTextColor="#a8a29e"
             keyboardType="phone-pad"
             value={form.no_hp}
             onChangeText={(t) => setForm({ ...form, no_hp: t })}
           />
+
+          <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
+            TANGGAL LAHIR
+          </Text>
+          <TouchableOpacity
+            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+            onPress={() => setShowDatePicker(true)}>
+            <Text
+              className={`text-sm ${
+                form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+              }`}>
+              {form.tanggal_lahir || 'Pilih tanggal lahir'}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.tanggal_lahir ? new Date(form.tanggal_lahir) : new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onValueChange={onDateChange}
+              onDismiss={() => setShowDatePicker(false)}
+            />
+          )}
 
           <Button
             className="w-full bg-amber-700 active:opacity-90"
@@ -167,6 +273,20 @@ export default function EditPengurus() {
           <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
             Menghapus data pengurus akan menghilangkan seluruh informasi terkait secara permanen.
           </Text>
+
+          {/* Tombol Reset Password */}
+          <TouchableOpacity
+            className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-3.5 dark:border-blue-900/50 dark:bg-stone-900"
+            onPress={handleResetPassword}
+            disabled={resettingPassword}
+            activeOpacity={0.7}>
+            <Ionicons name="key-outline" size={16} color="#2563eb" />
+            <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              {resettingPassword ? 'Mereset...' : 'Reset Password'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Tombol Hapus */}
           <TouchableOpacity
             className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
             onPress={handleDelete}
