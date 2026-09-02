@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert'; // komponen Alert custom
 
 const generateNomorAnggota = (existingNumbers: string[]): string => {
-  // Extract numeric part from format PSHT-000000
   const numbers = existingNumbers
     .map((num) => {
       const match = num.match(/PSHT-(\d+)/);
@@ -29,8 +28,24 @@ const generateNomorAnggota = (existingNumbers: string[]): string => {
   return `PSHT-${nextNumber}`;
 };
 
+type FormState = {
+  nomor_anggota: string;
+  name: string;
+  jenis_kelamin: string;
+  tanggal_lahir: string;
+  alamat: string;
+  no_hp: string;
+  email: string;
+  password: string;
+};
+
+type FieldErrors = Partial<Record<keyof FormState, string>>;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^0[0-9]{9,13}$/;
+
 export default function CreateUser() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     nomor_anggota: '',
     name: '',
     jenis_kelamin: '',
@@ -43,18 +58,29 @@ export default function CreateUser() {
   const [showPassword, setShowPassword] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  // State untuk alert
   const [alert, setAlert] = useState<{
     type: 'success' | 'error';
     title: string;
     description?: string;
   } | null>(null);
 
-  // Fungsi untuk menampilkan alert dan otomatis hilang setelah 4 detik
   const showAlert = (type: 'success' | 'error', title: string, description?: string) => {
     setAlert({ type, title, description });
     setTimeout(() => setAlert(null), 4000);
+  };
+
+  // Update satu field sekaligus bersihkan error field itu
+  const updateField = (key: keyof FormState, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   };
 
   const generateNumber = async () => {
@@ -66,7 +92,6 @@ export default function CreateUser() {
       const newNumber = generateNomorAnggota(existingNumbers);
       setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
     } catch (error) {
-      // Fallback: generate with timestamp if API fails
       const timestamp = Date.now().toString().slice(-6);
       setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
     }
@@ -76,12 +101,82 @@ export default function CreateUser() {
     generateNumber();
   }, []);
 
+  // Validasi ringan di sisi client sebelum hit API
+  const validateClientSide = (): FieldErrors => {
+    const errors: FieldErrors = {};
+
+    if (!form.name.trim()) {
+      errors.name = 'Nama lengkap wajib diisi';
+    } else if (form.name.trim().length < 3) {
+      errors.name = 'Nama minimal 3 karakter';
+    }
+
+    if (!form.jenis_kelamin) {
+      errors.jenis_kelamin = 'Jenis kelamin wajib dipilih';
+    }
+
+    if (!form.tanggal_lahir) {
+      errors.tanggal_lahir = 'Tanggal lahir wajib diisi';
+    }
+
+    if (!form.alamat.trim()) {
+      errors.alamat = 'Alamat wajib diisi';
+    }
+
+    if (!form.no_hp.trim()) {
+      errors.no_hp = 'Nomor HP wajib diisi';
+    } else if (!PHONE_REGEX.test(form.no_hp.trim())) {
+      errors.no_hp = 'Format nomor HP tidak valid (contoh: 08xxxxxxxxxx)';
+    }
+
+    if (!form.email.trim()) {
+      errors.email = 'Email wajib diisi';
+    } else if (!EMAIL_REGEX.test(form.email.trim())) {
+      errors.email = 'Format email tidak valid';
+    }
+
+    if (!form.password) {
+      errors.password = 'Password wajib diisi';
+    } else if (form.password.length < 8) {
+      errors.password = 'Password minimal 8 karakter';
+    }
+
+    return errors;
+  };
+
+  // Mapping error dari backend (format Laravel: { errors: { field: string[] } })
+  // sesuaikan key di sini kalau nama field backend berbeda dari form
+  const mapServerErrors = (data: any): FieldErrors => {
+    const mapped: FieldErrors = {};
+    const rawErrors = data?.errors;
+
+    if (rawErrors && typeof rawErrors === 'object') {
+      Object.keys(rawErrors).forEach((key) => {
+        const value = rawErrors[key];
+        const message = Array.isArray(value) ? value[0] : String(value);
+        if (key in form) {
+          mapped[key as keyof FormState] = message;
+        }
+      });
+    }
+
+    return mapped;
+  };
+
   const handleSave = async () => {
+    // Validasi client-side dulu, biar user langsung dapat feedback
+    const clientErrors = validateClientSide();
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      showAlert('error', 'Data belum lengkap', 'Periksa kembali kolom yang ditandai merah');
+      return;
+    }
+
+    setFieldErrors({});
     setLoading(true);
     try {
       await api.post('/users', form);
       showAlert('success', 'Berhasil', 'Anggota baru ditambahkan');
-      // Reset form ke nilai awal
       setForm({
         nomor_anggota: '',
         name: '',
@@ -97,10 +192,31 @@ export default function CreateUser() {
       } else {
         router.replace('/');
       }
-      // Generate nomor anggota baru untuk input berikutnya
       generateNumber();
     } catch (e: any) {
-      showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
+      const status = e?.response?.status;
+      const data = e?.response?.data;
+
+      if (status === 422 && data?.errors) {
+        // Error validasi spesifik per field dari backend
+        const serverErrors = mapServerErrors(data);
+        setFieldErrors(serverErrors);
+
+        const errorCount = Object.keys(serverErrors).length;
+        showAlert(
+          'error',
+          'Validasi gagal',
+          errorCount > 0
+            ? `Periksa kembali ${errorCount} kolom yang ditandai merah`
+            : (data?.message ?? 'Terjadi kesalahan validasi')
+        );
+      } else if (status === 409 || data?.message?.toLowerCase?.().includes('email')) {
+        // Kasus umum: email/nomor sudah terdaftar
+        setFieldErrors((prev) => ({ ...prev, email: data?.message ?? 'Email sudah terdaftar' }));
+        showAlert('error', 'Gagal', data?.message ?? 'Email sudah terdaftar');
+      } else {
+        showAlert('error', 'Gagal', data?.message ?? 'Terjadi kesalahan, silakan coba lagi');
+      }
     } finally {
       setLoading(false);
     }
@@ -110,12 +226,11 @@ export default function CreateUser() {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
       if (selectedDate) {
-        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+        updateField('tanggal_lahir', selectedDate.toISOString().split('T')[0]);
       }
     } else {
-      // iOS
       if (selectedDate) {
-        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+        updateField('tanggal_lahir', selectedDate.toISOString().split('T')[0]);
       }
     }
   };
@@ -156,7 +271,6 @@ export default function CreateUser() {
         {/* Form Card */}
         <View className="flex-1 px-5">
           <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-            {/* Alert ditampilkan di dalam card */}
             {alert && (
               <View className="mb-4">
                 <Alert
@@ -180,29 +294,36 @@ export default function CreateUser() {
                   value={form.nomor_anggota}
                 />
               </View>
-              {/* <TouchableOpacity
-              onPress={generateNumber}
-              className="mt-7 h-11 w-11 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <Ionicons name="refresh" size={20} color="#b45309" />
-            </TouchableOpacity> */}
             </View>
+
             <FieldLabel text="NAMA LENGKAP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.name
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="Nama anggota"
               placeholderTextColor="#a8a29e"
               value={form.name}
-              onChangeText={(t) => setForm({ ...form, name: t })}
+              onChangeText={(t) => updateField('name', t)}
             />
+            <FieldErrorText message={fieldErrors.name} />
+
             <FieldLabel text="JENIS KELAMIN" />
-            <View className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800">
+            <View
+              className={`mb-1 overflow-hidden rounded-xl border ${
+                fieldErrors.jenis_kelamin
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}>
               <TouchableOpacity
                 className="flex-row items-center justify-between px-4 py-3"
                 onPress={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    jenis_kelamin: prev.jenis_kelamin === 'Laki-Laki' ? 'Perempuan' : 'Laki-Laki',
-                  }))
+                  updateField(
+                    'jenis_kelamin',
+                    form.jenis_kelamin === 'Laki-Laki' ? 'Perempuan' : 'Laki-Laki'
+                  )
                 }>
                 <Text
                   className={`text-sm ${
@@ -213,12 +334,16 @@ export default function CreateUser() {
                 <Ionicons name="swap-horizontal-outline" size={18} color="#a8a29e" />
               </TouchableOpacity>
             </View>
+            <FieldErrorText message={fieldErrors.jenis_kelamin} />
+
             <FieldLabel text="TANGGAL LAHIR" />
             <TouchableOpacity
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
-              onPress={() => {
-                setShowDatePicker(true);
-              }}>
+              className={`mb-1 rounded-xl border px-4 py-3 ${
+                fieldErrors.tanggal_lahir
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
+              onPress={() => setShowDatePicker(true)}>
               <Text
                 className={`text-sm ${
                   form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
@@ -226,6 +351,7 @@ export default function CreateUser() {
                 {form.tanggal_lahir || 'Pilih tanggal lahir'}
               </Text>
             </TouchableOpacity>
+            <FieldErrorText message={fieldErrors.tanggal_lahir} />
             {showDatePicker && (
               <DateTimePicker
                 value={form.tanggal_lahir ? new Date(form.tanggal_lahir) : new Date()}
@@ -235,9 +361,14 @@ export default function CreateUser() {
                 onDismiss={() => setShowDatePicker(false)}
               />
             )}
+
             <FieldLabel text="ALAMAT LENGKAP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.alamat
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="Alamat lengkap"
               placeholderTextColor="#a8a29e"
               multiline
@@ -245,36 +376,55 @@ export default function CreateUser() {
               textAlignVertical="top"
               style={{ minHeight: 60 }}
               value={form.alamat}
-              onChangeText={(t) => setForm({ ...form, alamat: t })}
+              onChangeText={(t) => updateField('alamat', t)}
             />
+            <FieldErrorText message={fieldErrors.alamat} />
+
             <FieldLabel text="NO. HP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.no_hp
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="08xxxxxxxxxx"
               placeholderTextColor="#a8a29e"
               keyboardType="phone-pad"
               value={form.no_hp}
-              onChangeText={(t) => setForm({ ...form, no_hp: t })}
+              onChangeText={(t) => updateField('no_hp', t)}
             />
+            <FieldErrorText message={fieldErrors.no_hp} />
+
             <FieldLabel text="EMAIL" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.email
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="nama@email.com"
               placeholderTextColor="#a8a29e"
               autoCapitalize="none"
               keyboardType="email-address"
               value={form.email}
-              onChangeText={(t) => setForm({ ...form, email: t })}
+              onChangeText={(t) => updateField('email', t)}
             />
+            <FieldErrorText message={fieldErrors.email} />
+
             <FieldLabel text="PASSWORD" />
-            <View className="mb-5 flex-row items-center rounded-xl border border-stone-200 bg-stone-50 pr-3 dark:border-stone-700 dark:bg-stone-800">
+            <View
+              className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
+                fieldErrors.password
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}>
               <TextInput
                 className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
                 placeholder="Minimal 8 karakter"
                 placeholderTextColor="#a8a29e"
                 secureTextEntry={!showPassword}
                 value={form.password}
-                onChangeText={(t) => setForm({ ...form, password: t })}
+                onChangeText={(t) => updateField('password', t)}
               />
               <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
                 <Text className="text-xs font-medium text-amber-700 dark:text-amber-500">
@@ -282,8 +432,10 @@ export default function CreateUser() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <FieldErrorText message={fieldErrors.password} />
+
             <Button
-              className="w-full bg-amber-700 active:opacity-90"
+              className="mt-4 w-full bg-amber-700 active:opacity-90"
               size="lg"
               onPress={handleSave}
               disabled={loading}>
@@ -302,6 +454,15 @@ function FieldLabel({ text, optional = false }: { text: string; optional?: boole
   return (
     <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
       {text} {optional && <Text className="text-stone-400 dark:text-stone-600">(opsional)</Text>}
+    </Text>
+  );
+}
+
+function FieldErrorText({ message }: { message?: string }) {
+  if (!message) return <View className="mb-4" />;
+  return (
+    <Text className="mb-4 mt-1 text-xs text-red-600 dark:text-red-400">
+      {message}
     </Text>
   );
 }

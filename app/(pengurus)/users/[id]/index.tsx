@@ -32,6 +32,7 @@ export default function EditUser() {
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false); // state baru
 
   const fetchUser = async () => {
     try {
@@ -85,6 +86,49 @@ export default function EditUser() {
     } finally {
       setApproving(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    if (!form.tanggal_lahir) {
+      Alert.alert(
+        'Perhatian',
+        'Tanggal lahir belum diisi. Isi terlebih dahulu sebelum mereset password.'
+      );
+      return;
+    }
+
+    // Format tanggal lahir dari YYYY-MM-DD menjadi DDMMYYYY
+    const [year, month, day] = form.tanggal_lahir.split('-');
+    const defaultPassword = `${day}${month}${year}`;
+
+    Alert.alert(
+      'Reset Password',
+      `Password akan direset ke format tanggal lahir (DDMMYYYY): ${defaultPassword}`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: async () => {
+            setResettingPassword(true);
+            try {
+              // Asumsi endpoint: PATCH /users/:id/reset-password
+              // Ganti dengan endpoint yang sesuai di backend Anda
+              await api.patch(`/users/${id}/reset-password`, {
+                password: defaultPassword,
+              });
+              Alert.alert('Berhasil', `Password telah direset ke ${defaultPassword}`);
+            } catch (e: any) {
+              Alert.alert(
+                'Gagal',
+                e.response?.data?.message ?? 'Terjadi kesalahan saat mereset password'
+              );
+            } finally {
+              setResettingPassword(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDelete = () => {
@@ -305,6 +349,20 @@ export default function EditUser() {
           <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
             Menghapus anggota akan menghilangkan seluruh riwayat keanggotaan secara permanen.
           </Text>
+
+          {/* Tombol Reset Password */}
+          <TouchableOpacity
+            className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-3.5 dark:border-blue-900/50 dark:bg-stone-900"
+            onPress={handleResetPassword}
+            disabled={resettingPassword}
+            activeOpacity={0.7}>
+            <Ionicons name="key-outline" size={16} color="#2563eb" />
+            <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              {resettingPassword ? 'Mereset...' : 'Reset Password'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Tombol Hapus */}
           <TouchableOpacity
             className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
             onPress={handleDelete}

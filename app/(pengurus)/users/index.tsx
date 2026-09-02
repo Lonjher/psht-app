@@ -3,7 +3,6 @@ import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput } 
 import { useFocusEffect, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
-import { WithTabs } from '~/components/WithTabs';
 
 interface User {
   id: number;
@@ -67,13 +66,7 @@ export default function ListUsers() {
       <View className="bg-stone-800 px-5 pb-6 pt-14 dark:bg-stone-900">
         <View className="mb-5 flex-row items-center justify-between">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/');
-            }}
+            onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

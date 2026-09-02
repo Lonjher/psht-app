@@ -25,6 +25,20 @@ interface RegisterForm {
   no_hp: string;
 }
 
+interface FieldErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  password_confirmation?: string;
+  jenis_kelamin?: string;
+  tanggal_lahir?: string;
+  alamat?: string;
+  no_hp?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^0[0-9]{9,13}$/;
+
 export default function Register() {
   const [form, setForm] = useState<RegisterForm>({
     name: '',
@@ -40,6 +54,7 @@ export default function Register() {
   const [showConfirm, setShowConfirm] = useState<boolean>(false);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [success, setSuccess] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -55,59 +70,160 @@ export default function Register() {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
       if (selectedDate) {
-        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+        const formattedDate = selectedDate.toISOString().split('T')[0];
+        setForm((prev) => ({ ...prev, tanggal_lahir: formattedDate }));
+        // Clear error jika sudah diisi
+        setFieldErrors((prev) => ({ ...prev, tanggal_lahir: undefined }));
       }
     } else {
       if (selectedDate) {
-        setForm((prev) => ({ ...prev, tanggal_lahir: selectedDate.toISOString().split('T')[0] }));
+        const formattedDate = selectedDate.toISOString().split('T')[0];
+        setForm((prev) => ({ ...prev, tanggal_lahir: formattedDate }));
+        setFieldErrors((prev) => ({ ...prev, tanggal_lahir: undefined }));
       }
     }
   };
 
+  // Validasi per field
+  const validateField = (field: keyof RegisterForm, value: string): string | undefined => {
+    switch (field) {
+      case 'name':
+        if (!value.trim()) return 'Nama lengkap wajib diisi';
+        if (value.trim().length < 3) return 'Nama minimal 3 karakter';
+        if (value.trim().length > 255) return 'Nama maksimal 255 karakter';
+        return undefined;
+
+      case 'email':
+        if (!value.trim()) return 'Email wajib diisi';
+        if (!EMAIL_REGEX.test(value.trim())) return 'Format email tidak valid';
+        return undefined;
+
+      case 'password':
+        if (!value) return 'Kata sandi wajib diisi';
+        if (value.length < 8) return 'Kata sandi minimal 8 karakter';
+        if (value.length > 255) return 'Kata sandi maksimal 255 karakter';
+        if (!/[A-Z]/.test(value)) return 'Kata sandi harus mengandung huruf kapital';
+        if (!/[a-z]/.test(value)) return 'Kata sandi harus mengandung huruf kecil';
+        if (!/[0-9]/.test(value)) return 'Kata sandi harus mengandung angka';
+        return undefined;
+
+      case 'password_confirmation':
+        if (!value) return 'Konfirmasi kata sandi wajib diisi';
+        if (value !== form.password) return 'Konfirmasi kata sandi tidak cocok';
+        return undefined;
+
+      case 'jenis_kelamin':
+        if (!value) return 'Jenis kelamin wajib dipilih';
+        return undefined;
+
+      case 'tanggal_lahir':
+        if (!value) return 'Tanggal lahir wajib diisi';
+        
+        // Validasi umur minimal 5 tahun dan maksimal 100 tahun
+        const birthDate = new Date(value);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        
+        if (age < 5) return 'Umur minimal 5 tahun';
+        if (age > 100) return 'Umur maksimal 100 tahun';
+        return undefined;
+
+      case 'alamat':
+        if (!value.trim()) return 'Alamat wajib diisi';
+        if (value.trim().length < 10) return 'Alamat minimal 10 karakter';
+        if (value.trim().length > 500) return 'Alamat maksimal 500 karakter';
+        return undefined;
+
+      case 'no_hp':
+        if (!value.trim()) return 'Nomor HP wajib diisi';
+        if (!PHONE_REGEX.test(value.trim())) return 'Format nomor HP tidak valid (contoh: 08xxxxxxxxxx)';
+        return undefined;
+
+      default:
+        return undefined;
+    }
+  };
+
+  // Handler untuk update field dengan validasi
+  const handleFieldChange = (field: keyof RegisterForm, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    
+    // Validasi field yang berubah
+    const error = validateField(field, value);
+    setFieldErrors((prev) => ({ ...prev, [field]: error }));
+    
+    // Jika password berubah, validasi ulang konfirmasi password
+    if (field === 'password' && form.password_confirmation) {
+      const confirmError = validateField('password_confirmation', form.password_confirmation);
+      setFieldErrors((prev) => ({ ...prev, password_confirmation: confirmError }));
+    }
+  };
+
+  // Validasi semua field
+  const validateAllFields = (): FieldErrors => {
+    const errors: FieldErrors = {};
+    
+    (Object.keys(form) as Array<keyof RegisterForm>).forEach((field) => {
+      const error = validateField(field, form[field]);
+      if (error) {
+        errors[field] = error;
+      }
+    });
+    
+    return errors;
+  };
+
   const handleRegister = async () => {
     setError('');
-
-    // Validasi field kosong
-    const requiredFields = [
-      form.name.trim(),
-      form.email.trim(),
-      form.password,
-      form.password_confirmation,
-      form.jenis_kelamin,
-      form.tanggal_lahir,
-      form.alamat.trim(),
-      form.no_hp.trim(),
-    ];
-    if (requiredFields.some((field) => !field)) {
-      setError('Semua kolom wajib diisi.');
-      return;
-    }
-
-    // Validasi format email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email)) {
-      setError('Format email tidak valid.');
-      return;
-    }
-
-    // Validasi panjang password
-    if (form.password.length < 8) {
-      setError('Kata sandi minimal 8 karakter.');
-      return;
-    }
-
-    // Validasi kecocokan password
-    if (form.password !== form.password_confirmation) {
-      setError('Konfirmasi kata sandi tidak cocok.');
+    
+    // Validasi semua field
+    const errors = validateAllFields();
+    setFieldErrors(errors);
+    
+    // Cek jika ada error
+    if (Object.keys(errors).length > 0) {
+      setError('Periksa kembali kolom yang ditandai merah');
       return;
     }
 
     setLoading(true);
     try {
-      await api.post('/register', form);
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        password_confirmation: form.password_confirmation,
+        jenis_kelamin: form.jenis_kelamin,
+        tanggal_lahir: form.tanggal_lahir,
+        alamat: form.alamat.trim(),
+        no_hp: form.no_hp.trim(),
+      };
+      
+      await api.post('/register', payload);
       setSuccess(true);
-    } catch (e) {
-      setError('Pendaftaran gagal. Periksa kembali data Anda.');
+    } catch (e: any) {
+      console.error('Register error:', e);
+      
+      // Handle error dari backend
+      const serverErrors = e.response?.data?.errors;
+      if (serverErrors && typeof serverErrors === 'object') {
+        const mappedErrors: FieldErrors = {};
+        Object.keys(serverErrors).forEach((key) => {
+          const value = serverErrors[key];
+          const message = Array.isArray(value) ? value[0] : String(value);
+          if (key in form) {
+            mappedErrors[key as keyof RegisterForm] = message;
+          }
+        });
+        setFieldErrors(mappedErrors);
+        setError('Pendaftaran gagal. Periksa kembali data Anda.');
+      } else {
+        setError(e.response?.data?.message ?? 'Pendaftaran gagal. Periksa kembali data Anda.');
+      }
     } finally {
       setLoading(false);
     }
@@ -176,27 +292,30 @@ export default function Register() {
             ) : null}
 
             {/* Nama Lengkap */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              NAMA LENGKAP
-            </Text>
+            <FieldLabel text="NAMA LENGKAP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.name
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="Nama lengkap"
               placeholderTextColor="#a8a29e"
               value={form.name}
-              onChangeText={(text) => setForm({ ...form, name: text })}
+              onChangeText={(text) => handleFieldChange('name', text)}
             />
+            <FieldErrorText message={fieldErrors.name} />
 
             {/* Jenis Kelamin */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              JENIS KELAMIN
-            </Text>
-            <View className="mb-4 flex-row gap-2">
+            <FieldLabel text="JENIS KELAMIN" />
+            <View className="mb-1 flex-row gap-2">
               <TouchableOpacity
-                onPress={() => setForm({ ...form, jenis_kelamin: 'Laki-Laki' })}
+                onPress={() => handleFieldChange('jenis_kelamin', 'Laki-Laki')}
                 className={`flex-1 rounded-xl border px-4 py-3 ${
                   form.jenis_kelamin === 'Laki-Laki'
                     ? 'border-amber-700 bg-amber-50 dark:border-amber-500 dark:bg-amber-900/20'
+                    : fieldErrors.jenis_kelamin
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
                     : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
                 }`}>
                 <Text
@@ -209,10 +328,12 @@ export default function Register() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setForm({ ...form, jenis_kelamin: 'Perempuan' })}
+                onPress={() => handleFieldChange('jenis_kelamin', 'Perempuan')}
                 className={`flex-1 rounded-xl border px-4 py-3 ${
                   form.jenis_kelamin === 'Perempuan'
                     ? 'border-amber-700 bg-amber-50 dark:border-amber-500 dark:bg-amber-900/20'
+                    : fieldErrors.jenis_kelamin
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
                     : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
                 }`}>
                 <Text
@@ -225,13 +346,16 @@ export default function Register() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <FieldErrorText message={fieldErrors.jenis_kelamin} />
 
             {/* Tanggal Lahir */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              TANGGAL LAHIR
-            </Text>
+            <FieldLabel text="TANGGAL LAHIR" />
             <TouchableOpacity
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+              className={`mb-1 rounded-xl border px-4 py-3 ${
+                fieldErrors.tanggal_lahir
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               onPress={() => setShowDatePicker(true)}>
               <Text
                 className={`text-sm ${
@@ -240,22 +364,24 @@ export default function Register() {
                 {form.tanggal_lahir || 'Pilih tanggal lahir'}
               </Text>
             </TouchableOpacity>
+            <FieldErrorText message={fieldErrors.tanggal_lahir} />
             {showDatePicker && (
               <DateTimePicker
                 value={form.tanggal_lahir ? new Date(form.tanggal_lahir) : new Date()}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={onDateChange}
-                onDismiss={() => setShowDatePicker(false)}
               />
             )}
 
             {/* Alamat */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              ALAMAT
-            </Text>
+            <FieldLabel text="ALAMAT LENGKAP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.alamat
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="Alamat lengkap"
               placeholderTextColor="#a8a29e"
               multiline
@@ -263,48 +389,59 @@ export default function Register() {
               textAlignVertical="top"
               style={{ minHeight: 60 }}
               value={form.alamat}
-              onChangeText={(text) => setForm({ ...form, alamat: text })}
+              onChangeText={(text) => handleFieldChange('alamat', text)}
             />
+            <FieldErrorText message={fieldErrors.alamat} />
 
             {/* No HP */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              NO. HP
-            </Text>
+            <FieldLabel text="NO. HP" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.no_hp
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="08xxxxxxxxxx"
               placeholderTextColor="#a8a29e"
               keyboardType="phone-pad"
               value={form.no_hp}
-              onChangeText={(text) => setForm({ ...form, no_hp: text })}
+              onChangeText={(text) => handleFieldChange('no_hp', text)}
+              maxLength={14}
             />
+            <FieldErrorText message={fieldErrors.no_hp} />
 
             {/* Email */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              EMAIL
-            </Text>
+            <FieldLabel text="EMAIL" />
             <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                fieldErrors.email
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
               placeholder="nama@email.com"
               placeholderTextColor="#a8a29e"
               value={form.email}
-              onChangeText={(text) => setForm({ ...form, email: text })}
+              onChangeText={(text) => handleFieldChange('email', text)}
               autoCapitalize="none"
               keyboardType="email-address"
             />
+            <FieldErrorText message={fieldErrors.email} />
 
             {/* Kata Sandi */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              KATA SANDI
-            </Text>
-            <View className="mb-4 flex-row items-center rounded-xl border border-stone-200 bg-stone-50 pr-3 dark:border-stone-700 dark:bg-stone-800">
+            <FieldLabel text="KATA SANDI" />
+            <View
+              className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
+                fieldErrors.password
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}>
               <TextInput
                 className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
                 placeholder="Minimal 8 karakter"
                 placeholderTextColor="#a8a29e"
                 secureTextEntry={!showPassword}
                 value={form.password}
-                onChangeText={(text) => setForm({ ...form, password: text })}
+                onChangeText={(text) => handleFieldChange('password', text)}
               />
               <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
                 <Text className="text-xs font-medium text-amber-700 dark:text-amber-500">
@@ -312,19 +449,23 @@ export default function Register() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <FieldErrorText message={fieldErrors.password} />
 
             {/* Konfirmasi Kata Sandi */}
-            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
-              KONFIRMASI KATA SANDI
-            </Text>
-            <View className="mb-5 flex-row items-center rounded-xl border border-stone-200 bg-stone-50 pr-3 dark:border-stone-700 dark:bg-stone-800">
+            <FieldLabel text="KONFIRMASI KATA SANDI" />
+            <View
+              className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
+                fieldErrors.password_confirmation
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}>
               <TextInput
                 className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
                 placeholder="Ulangi kata sandi"
                 placeholderTextColor="#a8a29e"
                 secureTextEntry={!showConfirm}
                 value={form.password_confirmation}
-                onChangeText={(text) => setForm({ ...form, password_confirmation: text })}
+                onChangeText={(text) => handleFieldChange('password_confirmation', text)}
                 onSubmitEditing={handleRegister}
               />
               <TouchableOpacity onPress={() => setShowConfirm((v) => !v)}>
@@ -333,9 +474,10 @@ export default function Register() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <FieldErrorText message={fieldErrors.password_confirmation} />
 
             <Button
-              className="w-full bg-amber-700 active:opacity-90"
+              className="mt-4 w-full bg-amber-700 active:opacity-90"
               size="lg"
               onPress={handleRegister}
               disabled={loading}>
@@ -364,5 +506,21 @@ export default function Register() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// Helper components
+function FieldLabel({ text }: { text: string }) {
+  return (
+    <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">{text}</Text>
+  );
+}
+
+function FieldErrorText({ message }: { message?: string }) {
+  if (!message) return <View className="mb-4" />;
+  return (
+    <Text className="mb-4 mt-1 text-xs text-red-600 dark:text-red-400">
+      {message}
+    </Text>
   );
 }
