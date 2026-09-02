@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TextInput,
-  Alert,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert'; // komponen Alert custom
 
 const generateNomorAnggota = (existingNumbers: string[]): string => {
   // Extract numeric part from format PSHT-000000
@@ -44,6 +44,19 @@ export default function CreateUser() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // State untuk alert
+  const [alert, setAlert] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    description?: string;
+  } | null>(null);
+
+  // Fungsi untuk menampilkan alert dan otomatis hilang setelah 4 detik
+  const showAlert = (type: 'success' | 'error', title: string, description?: string) => {
+    setAlert({ type, title, description });
+    setTimeout(() => setAlert(null), 4000);
+  };
+
   const generateNumber = async () => {
     try {
       const res = await api.get('/users');
@@ -67,7 +80,7 @@ export default function CreateUser() {
     setLoading(true);
     try {
       await api.post('/users', form);
-      Alert.alert('Berhasil', 'Anggota baru ditambahkan');
+      showAlert('success', 'Berhasil', 'Anggota baru ditambahkan');
       // Reset form ke nilai awal
       setForm({
         nomor_anggota: '',
@@ -87,7 +100,7 @@ export default function CreateUser() {
       // Generate nomor anggota baru untuk input berikutnya
       generateNumber();
     } catch (e: any) {
-      Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
+      showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
     } finally {
       setLoading(false);
     }
@@ -111,8 +124,7 @@ export default function CreateUser() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // sesuaikan dengan tinggi header
-    >
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
       <ScrollView
         className="flex-1 bg-stone-50 dark:bg-stone-950"
         contentContainerClassName="flex-grow"
@@ -144,6 +156,18 @@ export default function CreateUser() {
         {/* Form Card */}
         <View className="flex-1 px-5">
           <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+            {/* Alert ditampilkan di dalam card */}
+            {alert && (
+              <View className="mb-4">
+                <Alert
+                  variant={alert.type === 'success' ? 'success' : 'destructive'}
+                  title={alert.title}
+                  description={alert.description}
+                  onClose={() => setAlert(null)}
+                />
+              </View>
+            )}
+
             <View className="mb-4 flex-row items-center gap-2">
               <View className="flex-1">
                 <FieldLabel text="NO. ANGGOTA" />
@@ -196,7 +220,9 @@ export default function CreateUser() {
                 setShowDatePicker(true);
               }}>
               <Text
-                className={`text-sm ${form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'}`}>
+                className={`text-sm ${
+                  form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                }`}>
                 {form.tanggal_lahir || 'Pilih tanggal lahir'}
               </Text>
             </TouchableOpacity>
@@ -209,7 +235,7 @@ export default function CreateUser() {
                 onDismiss={() => setShowDatePicker(false)}
               />
             )}
-            <FieldLabel text="ALAMAT" />
+            <FieldLabel text="ALAMAT LENGKAP" />
             <TextInput
               className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
               placeholder="Alamat lengkap"

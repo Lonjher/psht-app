@@ -8,6 +8,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Linking, // tambahkan import Linking
 } from 'react-native';
 import { router } from 'expo-router';
 import { setAuthSession, setAuthToken } from '@/services/authStore';
@@ -53,12 +54,28 @@ export default function Login() {
     }
   };
 
+  // Fungsi untuk membuka WhatsApp Admin
+  const handleForgotPassword = async () => {
+    const url = 'https://wa.me/6287780916272';
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        // Fallback: coba buka dengan browser biasa
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      console.error('Gagal membuka WhatsApp:', error);
+      // Bisa tambahkan alert atau pesan error di UI jika diperlukan
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // sesuaikan dengan tinggi header
-    >
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
       <ScrollView
         className="flex-1 bg-stone-50 dark:bg-stone-950"
         contentContainerClassName="flex-grow"
@@ -127,7 +144,7 @@ export default function Login() {
             </View>
 
             <View className="mb-5 items-end">
-              <TouchableOpacity>
+              <TouchableOpacity onPress={handleForgotPassword}>
                 <Text className="text-xs font-medium text-stone-500 dark:text-stone-400">
                   Lupa kata sandi?
                 </Text>

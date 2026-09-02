@@ -90,7 +90,7 @@ function Welcome({ session }: { session: { role: string | null; token: string | 
             PSHT Ranting{'\n'}Guluk-Guluk
           </Text>
           <Text className="mt-3 text-center text-sm leading-5 text-stone-300">
-            Persaudaraan Setia Hati Terate{'\n'}Sistem Informasi Anggota & Kenaikan Kelas
+            Persaudaraan Setia Hati Terate{'\n'}Sistem Informasi Anggota & Kenaikan Tingkat
           </Text>
 
           <View className="mt-7 w-full gap-3">
@@ -132,11 +132,11 @@ function Welcome({ session }: { session: { role: string | null; token: string | 
       {/* ===== STATS SECTION ===== */}
       <View className="-mt-7 flex-row justify-center px-6">
         <View className="w-full flex-row justify-between rounded-2xl border border-stone-200 bg-white px-4 py-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-          <StatItem label="Anggota" value="240+" />
+          <StatItem label="Anggota" value="10+" />
           <Divider />
-          <StatItem label="Tingkat" value="4" />
+          <StatItem label="Tingkat" value="5" />
           <Divider />
-          <StatItem label="Berdiri" value="1990" />
+          <StatItem label="Berdiri" value="1922" />
         </View>
       </View>
 
@@ -191,7 +191,7 @@ function Welcome({ session }: { session: { role: string | null; token: string | 
         <View className="flex-row flex-wrap justify-between">
           <FeatureCard icon="📋" title="Data Anggota" desc="Kelola profil & biodata" />
           <FeatureCard icon="📈" title="Kenaikan Tingkat" desc="Riwayat & jadwal ujian" />
-          <FeatureCard icon="🏆" title="Sertifikat" desc="Riwayat kelulusan tingkat" />
+          {/* <FeatureCard icon="🏆" title="Sertifikat" desc="Riwayat kelulusan tingkat" /> */}
           <FeatureCard icon="🔍" title="Cek Anggota" desc="Verifikasi status anggota" />
         </View>
       </View>
