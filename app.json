@@ -2,14 +2,12 @@
   "expo": {
     "name": "PSHT App",
     "slug": "psht-app",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "psht-app",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
@@ -27,7 +25,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.png",
+          "image": "./assets/images/logo.png",
           "resizeMode": "contain"
         }
       ],
@@ -50,9 +48,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9d098dfd-ed0c-4595-8d69-23a513ce4871"
+        "projectId": "a07d9797-e6b7-4242-87a2-0c370fd0f1d5"
       }
     },
-    "owner": "zaidanes-team"
+    "owner": "lonjher"
   }
 }
