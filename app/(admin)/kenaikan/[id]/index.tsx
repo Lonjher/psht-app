@@ -10,7 +10,7 @@ import {
   Platform,
   useColorScheme,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
@@ -43,7 +43,12 @@ interface AlertState {
 }
 
 export default function EditKenaikan() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo, returnId } = useLocalSearchParams<{
+    id: string;
+    returnTo?: string;
+    returnId?: string;
+  }>();
+  const navigation = useNavigation();
   const [form, setForm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,6 +71,23 @@ export default function EditKenaikan() {
 
   const hideAlert = () => {
     setAlertState((prev) => ({ ...prev, visible: false }));
+  };
+
+  const handleBack = () => {
+    if (returnTo === 'riwayat' && returnId) {
+      router.replace({
+        pathname: '/kenaikan/riwayat/[id]',
+        params: { id: returnId },
+      });
+      return;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    router.replace('/kenaikan');
   };
 
   // Hitung rata-rata dan update status otomatis
@@ -186,11 +208,7 @@ export default function EditKenaikan() {
       showAlert('success', 'Berhasil', 'Data kenaikan berhasil diperbarui');
       
       setTimeout(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/kenaikan');
-        }
+        handleBack();
       }, 1500);
     } catch (e: any) {
       console.error('Error updating:', e);
@@ -241,13 +259,7 @@ export default function EditKenaikan() {
         {/* Header */}
         <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/kenaikan');
-            }}
+            onPress={handleBack}
             className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

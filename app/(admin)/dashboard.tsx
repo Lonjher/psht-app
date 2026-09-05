@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { clearAuthSession, setAuthToken } from '@/services/authStore';
 import api from '@/services/api';
+import { Alert } from '@/components/Alert';
 
 interface DashboardData {
   total_anggota: number;
@@ -20,15 +20,62 @@ interface DashboardData {
   pending_anggota: number;
 }
 
+interface AlertState {
+  visible: boolean;
+  variant: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  description?: string;
+  onConfirm?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  showCancel?: boolean;
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [alertState, setAlertState] = useState<AlertState>({
+    visible: false,
+    variant: 'info',
+    title: '',
+    description: '',
+  });
+
+  const showAlert = (
+    variant: 'success' | 'error' | 'warning' | 'info',
+    title: string,
+    description?: string,
+    options?: {
+      onConfirm?: () => void;
+      confirmText?: string;
+      cancelText?: string;
+      showCancel?: boolean;
+    }
+  ) => {
+    setAlertState({
+      visible: true,
+      variant,
+      title,
+      description,
+      onConfirm: options?.onConfirm,
+      confirmText: options?.confirmText,
+      cancelText: options?.cancelText,
+      showCancel: options?.showCancel,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertState((prev) => ({ ...prev, visible: false }));
+  };
 
   const fetchData = useCallback(async () => {
     try {
       const res = await api.get('/dashboard');
       setData(res.data);
+    } catch (error) {
+      console.error('Error fetching dashboard:', error);
+      showAlert('error', 'Gagal Memuat Data', 'Terjadi kesalahan saat memuat data dashboard');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,18 +92,28 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Keluar Akun', 'Apakah Anda yakin ingin keluar?', [
-      { text: 'Batal', style: 'cancel' },
+    showAlert(
+      'warning',
+      'Keluar Akun',
+      'Apakah Anda yakin ingin keluar?',
       {
-        text: 'Keluar',
-        style: 'destructive',
-        onPress: async () => {
-          await clearAuthSession();
-          setAuthToken(null);
-          router.replace('/');
+        showCancel: true,
+        confirmText: 'Keluar',
+        cancelText: 'Batal',
+        onConfirm: async () => {
+          try {
+            await clearAuthSession();
+            setAuthToken(null);
+            hideAlert();
+            router.replace('/');
+          } catch (error) {
+            console.error('Error logging out:', error);
+            hideAlert();
+            showAlert('error', 'Gagal', 'Terjadi kesalahan saat keluar');
+          }
         },
-      },
-    ]);
+      }
+    );
   };
 
   if (loading) {
@@ -68,101 +125,116 @@ export default function AdminDashboard() {
   }
 
   return (
-    <View className="flex-1 bg-stone-50 dark:bg-stone-950">
-      {/* Header */}
-      <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-xs font-medium tracking-widest text-amber-500">DASHBOARD</Text>
-            <Text className="mt-1 text-xl font-bold text-white">Halo, Admin</Text>
-            <Text className="mt-0.5 text-xs text-stone-300">Selamat datang kembali</Text>
-          </View>
+    <>
+      <View className="flex-1 bg-stone-50 dark:bg-stone-950">
+        {/* Header */}
+        <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <Text className="text-xs font-medium tracking-widest text-amber-500">DASHBOARD</Text>
+              <Text className="mt-1 text-xl font-bold text-white">Halo, Admin</Text>
+              <Text className="mt-0.5 text-xs text-stone-300">Selamat datang kembali</Text>
+            </View>
 
-          <View className="flex-row gap-2">
-            <TouchableOpacity
-              onPress={() => router.push('/profile')}
-              className="h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10"
-              activeOpacity={0.7}>
-              <Ionicons name="person-outline" size={18} color="#ffffff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleLogout}
-              className="h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10"
-              activeOpacity={0.7}>
-              <Ionicons name="log-out-outline" size={18} color="#ffffff" />
-            </TouchableOpacity>
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => router.push('/profile')}
+                className="h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10"
+                activeOpacity={0.7}>
+                <Ionicons name="person-outline" size={18} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleLogout}
+                className="h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10"
+                activeOpacity={0.7}>
+                <Ionicons name="log-out-outline" size={18} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        <ScrollView
+          className="flex-1 px-5"
+          showsVerticalScrollIndicator={false}
+          contentContainerClassName="pb-10"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#b45309" />
+          }>
+          {/* Stats Grid */}
+          <View className="mt-5 flex-row flex-wrap">
+            <CardStat
+              label="Total Anggota"
+              value={data?.total_anggota ?? 0}
+              icon="people"
+              color="blue"
+            />
+            <CardStat
+              label="Pengurus"
+              value={data?.total_pengurus ?? 0}
+              icon="shield-checkmark"
+              color="violet"
+            />
+            <CardStat
+              label="Kenaikan"
+              value={data?.total_kenaikan ?? 0}
+              icon="trending-up"
+              color="emerald"
+            />
+            <CardStat
+              label="Menunggu Persetujuan"
+              value={data?.pending_anggota ?? 0}
+              icon="time"
+              color="amber"
+            />
+          </View>
+
+          {/* Menu Section */}
+          <Text className="mb-3 mt-8 text-base font-bold text-stone-800 dark:text-stone-100">
+            Menu Admin
+          </Text>
+
+          <View className="gap-2.5">
+            <MenuButton
+              label="Kelola Pengurus"
+              desc="Data pengurus ranting"
+              icon="shield-checkmark-outline"
+              onPress={() => router.push('/pengurus')}
+            />
+            <MenuButton
+              label="Kelola Anggota"
+              desc="Data & status keanggotaan"
+              icon="people-outline"
+              onPress={() => router.push('/users')}
+            />
+            <MenuButton
+              label="Kelola Tingkatan"
+              desc="Daftar tingkatan sabuk"
+              icon="layers-outline"
+              onPress={() => router.push('/tingkatan')}
+            />
+            <MenuButton
+              label="Kelola Kenaikan"
+              desc="Riwayat kenaikan tingkat"
+              icon="trending-up-outline"
+              onPress={() => router.push('/kenaikan')}
+            />
+          </View>
+        </ScrollView>
       </View>
 
-      <ScrollView
-        className="flex-1 px-5"
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-10"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#b45309" />
-        }>
-        {/* Stats Grid */}
-        <View className="mt-5 flex-row flex-wrap">
-          <CardStat
-            label="Total Anggota"
-            value={data?.total_anggota ?? 0}
-            icon="people"
-            color="blue"
-          />
-          <CardStat
-            label="Pengurus"
-            value={data?.total_pengurus ?? 0}
-            icon="shield-checkmark"
-            color="violet"
-          />
-          <CardStat
-            label="Kenaikan"
-            value={data?.total_kenaikan ?? 0}
-            icon="trending-up"
-            color="emerald"
-          />
-          <CardStat
-            label="Menunggu Persetujuan"
-            value={data?.pending_anggota ?? 0}
-            icon="time"
-            color="amber"
-          />
-        </View>
-
-        {/* Menu Section */}
-        <Text className="mb-3 mt-8 text-base font-bold text-stone-800 dark:text-stone-100">
-          Menu Admin
-        </Text>
-
-        <View className="gap-2.5">
-          <MenuButton
-            label="Kelola Pengurus"
-            desc="Data pengurus ranting"
-            icon="shield-checkmark-outline"
-            onPress={() => router.push('/pengurus')}
-          />
-          <MenuButton
-            label="Kelola Anggota"
-            desc="Data & status keanggotaan"
-            icon="people-outline"
-            onPress={() => router.push('/users')}
-          />
-          <MenuButton
-            label="Kelola Tingkatan"
-            desc="Daftar tingkatan sabuk"
-            icon="layers-outline"
-            onPress={() => router.push('/tingkatan')}
-          />
-          <MenuButton
-            label="Kelola Kenaikan"
-            desc="Riwayat kenaikan tingkat"
-            icon="trending-up-outline"
-            onPress={() => router.push('/kenaikan')}
-          />
-        </View>
-      </ScrollView>
-    </View>
+      {/* Alert Modal */}
+      <Alert
+        visible={alertState.visible}
+        variant={alertState.variant}
+        title={alertState.title}
+        description={alertState.description}
+        onClose={hideAlert}
+        onConfirm={alertState.onConfirm}
+        confirmText={alertState.confirmText}
+        cancelText={alertState.cancelText}
+        showCancel={alertState.showCancel}
+      />
+    </>
   );
 }
 

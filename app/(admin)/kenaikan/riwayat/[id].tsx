@@ -152,7 +152,11 @@ export default function RiwayatKenaikan() {
   const handleEdit = (kenaikanId: number) => {
     router.push({
       pathname: '/kenaikan/[id]',
-      params: { id: kenaikanId },
+      params: {
+        id: kenaikanId,
+        returnTo: 'riwayat',
+        returnId: userId,
+      },
     });
   };
 
