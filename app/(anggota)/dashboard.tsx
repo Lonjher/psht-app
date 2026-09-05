@@ -197,7 +197,7 @@ export default function AnggotaDashboard() {
               label="Profil Saya"
               desc="Kelola data diri dan akun"
               icon="person-outline"
-              onPress={() => router.push('/profile')}
+              onPress={() => router.push({ pathname: '/profile', params: { returnTo: 'dashboard' } })}
             />
           </View>
         </ScrollView>

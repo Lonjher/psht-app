@@ -10,7 +10,7 @@ import {
   Platform,
   useColorScheme,
 } from 'react-native';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
@@ -48,7 +48,6 @@ export default function EditKenaikan() {
     returnTo?: string;
     returnId?: string;
   }>();
-  const navigation = useNavigation();
   const [form, setForm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,11 +78,6 @@ export default function EditKenaikan() {
         pathname: '/kenaikan/riwayat/[id]',
         params: { id: returnId },
       });
-      return;
-    }
-
-    if (navigation.canGoBack()) {
-      navigation.goBack();
       return;
     }
 

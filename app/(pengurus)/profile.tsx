@@ -9,7 +9,7 @@ import {
   Platform,
   useColorScheme,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
@@ -34,6 +34,7 @@ interface AlertState {
 }
 
 export default function Profile() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ name: '', no_hp: '', alamat: '', tanggal_lahir: '' });
@@ -58,6 +59,15 @@ export default function Profile() {
 
   const hideAlert = () => {
     setAlertState((prev) => ({ ...prev, visible: false }));
+  };
+
+  const handleBack = () => {
+    if (editMode) {
+      setEditMode(false);
+      return;
+    }
+
+    router.replace('/(pengurus)/dashboard');
   };
 
   useEffect(() => {
@@ -174,13 +184,7 @@ export default function Profile() {
         {/* Header */}
         <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/(pengurus)/dashboard');
-            }}
+            onPress={handleBack}
             className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

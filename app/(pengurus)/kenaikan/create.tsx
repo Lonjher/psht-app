@@ -305,11 +305,7 @@ export default function CreateKenaikan() {
       showAlert('success', 'Berhasil', 'Data kenaikan berhasil disimpan');
       setTimeout(() => {
         resetForm();
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/kenaikan');
-        }
+        router.replace('/(pengurus)/kenaikan');
       }, 1500);
     } catch (e: any) {
       showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
@@ -388,13 +384,7 @@ export default function CreateKenaikan() {
         {/* Header */}
         <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/kenaikan');
-            }}
+            onPress={() => router.replace('/(pengurus)/kenaikan')}
             className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

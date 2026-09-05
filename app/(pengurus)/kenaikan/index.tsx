@@ -177,19 +177,13 @@ export default function ListKenaikan() {
       <View className="bg-stone-800 px-5 pb-6 pt-14 dark:bg-stone-900">
         <View className="mb-5 flex-row items-center justify-between">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/(admin)/dashboard');
-            }}
+            onPress={() => router.replace('/(pengurus)/dashboard')}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push('/kenaikan/create')}
+            onPress={() => router.push('/(pengurus)/kenaikan/create')}
             className="flex-row items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2"
             activeOpacity={0.8}>
             <Ionicons name="add" size={16} color="#ffffff" />
@@ -305,10 +299,11 @@ export default function ListKenaikan() {
               className="mb-3 flex-row items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none"
               onPress={() => {
                 router.push({
-                  pathname: '/kenaikan/riwayat/[id]',
+                  pathname: '/(pengurus)/kenaikan/riwayat/[id]',
                   params: {
                     id: item.id,
                     name: item.name,
+                    returnTo: 'kenaikan',
                   },
                 });
               }}

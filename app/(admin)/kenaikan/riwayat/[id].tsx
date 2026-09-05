@@ -241,13 +241,7 @@ export default function RiwayatKenaikan() {
         {/* Header */}
         <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/kenaikan');
-            }}
+            onPress={() => router.replace('/kenaikan')}
             className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

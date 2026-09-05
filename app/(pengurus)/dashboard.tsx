@@ -121,7 +121,7 @@ export default function PengurusDashboard() {
 
             <View className="flex-row gap-2">
               <TouchableOpacity
-                onPress={() => router.push('/profile')}
+                onPress={() => router.push({ pathname: '/profile', params: { returnTo: 'dashboard' } })}
                 className="h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10"
                 activeOpacity={0.7}>
                 <Ionicons name="person-outline" size={18} color="#ffffff" />

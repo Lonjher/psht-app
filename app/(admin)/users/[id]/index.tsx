@@ -85,21 +85,47 @@ export default function EditUser() {
     try {
       const res = await api.get(`/users/${id}`);
       const u = res.data;
+      
+      console.log('User data dari backend:', JSON.stringify(u, null, 2));
+      console.log('tingkatan_terakhir:', u.tingkatan_terakhir);
+      console.log('kenaikan_terakhir:', u.kenaikan_terakhir);
+      console.log('tingkatan:', u.tingkatan);
+      
+      // Helper untuk mendapatkan nama tingkatan (selalu string)
+      const getTingkatanName = (): string => {
+        // Cek tingkatan_terakhir
+        if (u.tingkatan_terakhir) {
+          if (typeof u.tingkatan_terakhir === 'string') {
+            return u.tingkatan_terakhir;
+          }
+          if (typeof u.tingkatan_terakhir === 'object' && u.tingkatan_terakhir.nama_tingkatan) {
+            return u.tingkatan_terakhir.nama_tingkatan;
+          }
+        }
+        
+        // Cek kenaikan_terakhir
+        if (u.kenaikan_terakhir?.tingkatan?.nama_tingkatan) {
+          return u.kenaikan_terakhir.tingkatan.nama_tingkatan;
+        }
+        
+        // Cek tingkatan langsung
+        if (u.tingkatan?.nama_tingkatan) {
+          return u.tingkatan.nama_tingkatan;
+        }
+        
+        return 'Belum ada tingkatan';
+      };
+      
       setForm({
-        name: u.name,
-        email: u.email,
+        name: u.name ?? '',
+        email: u.email ?? '',
         nomor_anggota: u.nomor_anggota ?? '',
         no_hp: u.no_hp ?? '',
         alamat: u.alamat ?? '',
         tanggal_lahir: u.tanggal_lahir ?? '',
-        status: u.status,
-        tingkatan_terakhir:
-          u.tingkatan_terakhir ??
-          u.kenaikan_terakhir?.tingkatan?.nama_tingkatan ??
-          u.tingkatan?.nama_tingkatan ??
-          'Belum ada tingkatan',
+        status: u.status ?? 'pending',
+        tingkatan_terakhir: getTingkatanName(),
       });
-      console.log('User data:', u);
     } catch (e) {
       console.error('Error fetching user:', e);
       showAlert('error', 'Gagal', 'Gagal memuat data anggota');
@@ -125,11 +151,7 @@ export default function EditUser() {
       showAlert('success', 'Berhasil', 'Data anggota berhasil diperbarui');
 
       setTimeout(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/users');
-        }
+        router.replace('/users');
       }, 1500);
     } catch (e: any) {
       console.error('Error updating:', e);
@@ -236,11 +258,7 @@ export default function EditUser() {
             showAlert('success', 'Dihapus', 'Data anggota berhasil dihapus');
 
             setTimeout(() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/users');
-              }
+              router.replace('/users');
             }, 1500);
           } catch (e: any) {
             hideAlert();
@@ -309,13 +327,7 @@ export default function EditUser() {
         {/* Header */}
         <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/users');
-            }}
+            onPress={() => router.replace('/users')}
             className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

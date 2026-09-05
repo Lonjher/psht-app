@@ -44,7 +44,7 @@ export default function ListTingkatan() {
       <View className="bg-stone-800 px-5 pb-6 pt-14 dark:bg-stone-900">
         <View className="mb-5 flex-row items-center justify-between">
           <TouchableOpacity
-            onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/(admin)/dashboard'); }}
+            onPress={() => router.replace('/(pengurus)/dashboard')}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>
@@ -80,7 +80,12 @@ export default function ListTingkatan() {
         renderItem={({ item, index }) => (
           <TouchableOpacity
             className="mb-3 flex-row items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none"
-            onPress={() => router.push({ pathname: '/tingkatan/[id]', params: { id: item.id } })}
+            onPress={() =>
+              router.push({
+                pathname: '/tingkatan/[id]',
+                params: { id: item.id, returnTo: 'tingkatan' },
+              })
+            }
             activeOpacity={0.7}>
             <View className="h-11 w-11 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
               <Text className="text-sm font-bold text-amber-700 dark:text-amber-500">

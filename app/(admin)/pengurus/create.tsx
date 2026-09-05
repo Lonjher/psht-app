@@ -246,11 +246,7 @@ export default function CreatePengurus() {
         });
         setFieldErrors({});
         
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/pengurus');
-        }
+        router.replace('/pengurus');
         
         generateNumber();
       }, 1500);
@@ -285,13 +281,7 @@ export default function CreatePengurus() {
         {/* Header */}
         <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/pengurus');
-              }
-            }}
+            onPress={() => router.replace('/pengurus')}
             className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>
