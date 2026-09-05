@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Link, Redirect, router, useFocusEffect } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 import { Button } from '~/components/ui/button';
 import { SplashScreen } from '~/components/SplashScreen';
@@ -12,11 +12,32 @@ interface DashboardData {
   total_tingkatan?: number;
 }
 
+// Durasi splash screen dalam milidetik
+const SPLASH_DURATION = 3000; // 3 detik
+
 export default function WelcomeGate() {
   const [session, setSession] = useState<{ role: string | null; token: string | null } | null>(
     null
   );
   const [isChecking, setIsChecking] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
+  const splashShownRef = useRef(false); // Ref untuk melacak apakah splash sudah pernah ditampilkan
+
+  // Tampilkan splash screen hanya sekali
+  useEffect(() => {
+    if (splashShownRef.current) {
+      setShowSplash(false);
+      return;
+    }
+    
+    splashShownRef.current = true;
+    
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, SPLASH_DURATION);
+
+    return () => clearTimeout(splashTimer);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,10 +60,21 @@ export default function WelcomeGate() {
     }, [])
   );
 
-  if (isChecking) {
+  // Tampilkan SplashScreen hanya jika splash belum pernah ditampilkan
+  if (showSplash && !splashShownRef.current) {
     return <SplashScreen />;
   }
 
+  // Jika masih checking session, tampilkan loading
+  if (isChecking && !showSplash) {
+    return (
+      <View className="flex-1 items-center justify-center bg-stone-50 dark:bg-stone-950">
+        <ActivityIndicator size="large" color="#b45309" />
+      </View>
+    );
+  }
+
+  // Selalu tampilkan Welcome page
   return <Welcome session={session} />;
 }
 
