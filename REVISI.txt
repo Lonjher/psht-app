@@ -1,0 +1,10 @@
+- Di Halaman Detail Anggota (Untuk Admin): Admin tidak bisa mengubah data Anggota dan tidak bisa Reset Password sebelum disetujui. ✅
+- Di Halaman Detail Anggota: Input No. Anggota buat disabled dan hanya terisi ketika Anggota sudah disetujui. ✅
+- Di Halaman Detail Anggota (Untuk Aadmin): Tambahkan Tingkatan Terakhir Anggota. ✅
+- Di Halaman Kenaikan Tingkat (Untuk Admin): Tambahkan Filter untuk setiap Tingkatan serta tambahkan jumlah di sebelah kanan. ✅
+- Di Halaman Input Kenaikan Tingkat (Untuk Admin) pada Select Pilih Anggota: Tampilkan hanya Anggota dengan selain Tingkatan Putih. ✅
+- Di Halaman Input Kenaikan Tingkat (Untuk Admin): Input Tingkatan buat disabled, hanya terisi secara otomatis oleh sistem.✅
+- Di Halaman Riwayat Tingkatan Anggota: Berikan Tombol Hapus Riwayat.✅
+- Tgl. Pendaftaran tidak muncul setelah di klik.✅
+- Di Halaman Kenaikan Tingkat: Label Kenaikan Tingkat Terakhir Tidak sesuai. Masih mengambil Tingkat pertama bukan Terakhir/terbaru ✅
+- Semua tombol kembali redirect ke halaman sebelumnya, bukan ke halaman Dashboard.

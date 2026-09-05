@@ -26,6 +26,7 @@ export default function EditUser() {
     alamat: '',
     tanggal_lahir: '', // tambahkan
     status: '',
+    tingkatan_terakhir: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,12 @@ export default function EditUser() {
         alamat: u.alamat ?? '',
         tanggal_lahir: u.tanggal_lahir ?? '', // tambahkan
         status: u.status,
+        tingkatan_terakhir:
+          u.kenaikan_terakhir?.tingkatan?.nama_tingkatan ??
+          u.tingkatan?.nama_tingkatan ??
+          'Belum ada tingkatan',
       });
+      console.log(u);
     } catch (e) {
       Alert.alert('Gagal', 'Gagal memuat data anggota');
     } finally {
@@ -59,6 +65,11 @@ export default function EditUser() {
   }, [id]);
 
   const handleUpdate = async () => {
+    if (isPending) {
+      Alert.alert('Perhatian', 'Anggota harus disetujui terlebih dahulu.');
+      return;
+    }
+
     setSaving(true);
     try {
       await api.put(`/users/${id}`, form);
@@ -66,7 +77,7 @@ export default function EditUser() {
       if (router.canGoBack()) {
         router.back();
       } else {
-        router.replace('/');
+        router.replace('/users');
       }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
@@ -89,6 +100,11 @@ export default function EditUser() {
   };
 
   const handleResetPassword = async () => {
+    if (isPending) {
+      Alert.alert('Perhatian', 'Anggota harus disetujui terlebih dahulu.');
+      return;
+    }
+
     if (!form.tanggal_lahir) {
       Alert.alert(
         'Perhatian',
@@ -145,7 +161,7 @@ export default function EditUser() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace('/');
+              router.replace('/users');
             }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
@@ -202,7 +218,7 @@ export default function EditUser() {
               router.back();
               return;
             }
-            router.replace('/');
+            router.replace('/users');
           }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
@@ -226,6 +242,12 @@ export default function EditUser() {
               isAktif ? 'text-emerald-400' : 'text-amber-400'
             }`}>
             {form.status}
+          </Text>
+        </View>
+
+        <View className="mt-2 rounded-full bg-white/10 px-3 py-1">
+          <Text className="text-xs font-medium text-stone-200">
+            {form.tingkatan_terakhir}
           </Text>
         </View>
       </View>
@@ -267,40 +289,54 @@ export default function EditUser() {
 
           <FieldLabel text="NAMA LENGKAP" />
           <TextInput
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+              isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
+            }`}
             value={form.name}
             onChangeText={(t) => setForm({ ...form, name: t })}
+            editable={!isPending}
           />
 
           <FieldLabel text="EMAIL" />
           <TextInput
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+              isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
+            }`}
             autoCapitalize="none"
             keyboardType="email-address"
             value={form.email}
             onChangeText={(t) => setForm({ ...form, email: t })}
+            editable={!isPending}
           />
 
           <FieldLabel text="NOMOR ANGGOTA" />
           <TextInput
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className="mb-4 rounded-xl border border-stone-200 bg-stone-200 px-4 py-3 text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-700 dark:text-stone-400"
             autoCapitalize="characters"
-            value={form.nomor_anggota}
-            onChangeText={(t) => setForm({ ...form, nomor_anggota: t })}
+            value={isAktif ? form.nomor_anggota : ''}
+            editable={false}
           />
 
           <FieldLabel text="NO HP" />
           <TextInput
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+              isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
+            }`}
             keyboardType="phone-pad"
             value={form.no_hp}
             onChangeText={(t) => setForm({ ...form, no_hp: t })}
+            editable={!isPending}
           />
 
           <FieldLabel text="TANGGAL LAHIR" />
           <TouchableOpacity
-            className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
-            onPress={() => setShowDatePicker(true)}>
+            className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 dark:border-stone-700 ${
+              isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
+            }`}
+            onPress={() => {
+              if (!isPending) setShowDatePicker(true);
+            }}
+            disabled={isPending}>
             <Text
               className={`text-sm ${
                 form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
@@ -320,20 +356,23 @@ export default function EditUser() {
 
           <FieldLabel text="ALAMAT" />
           <TextInput
-            className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+            className={`mb-5 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+              isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
+            }`}
             multiline
             numberOfLines={2}
             textAlignVertical="top"
             style={{ minHeight: 60 }}
             value={form.alamat}
             onChangeText={(t) => setForm({ ...form, alamat: t })}
+            editable={!isPending}
           />
 
           <Button
             className="w-full bg-amber-700 active:opacity-90"
             size="lg"
             onPress={handleUpdate}
-            disabled={saving}>
+            disabled={saving || isPending}>
             <Text className="font-semibold text-white">
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
             </Text>
@@ -354,7 +393,7 @@ export default function EditUser() {
           <TouchableOpacity
             className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-3.5 dark:border-blue-900/50 dark:bg-stone-900"
             onPress={handleResetPassword}
-            disabled={resettingPassword}
+            disabled={resettingPassword || isPending}
             activeOpacity={0.7}>
             <Ionicons name="key-outline" size={16} color="#2563eb" />
             <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">

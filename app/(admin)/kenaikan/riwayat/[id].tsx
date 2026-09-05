@@ -1,12 +1,6 @@
 // app/(admin)/kenaikan/riwayat/[id].tsx
 import { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
@@ -48,11 +42,12 @@ export default function RiwayatKenaikan() {
   const params = useLocalSearchParams();
   const userId = params.id as string;
   const name = params.name as string;
-  
+
   const [data, setData] = useState<KenaikanDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState(name || '');
   const [nomorAnggota, setNomorAnggota] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!userId || userId === 'undefined') {
@@ -60,27 +55,52 @@ export default function RiwayatKenaikan() {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      // Langsung gunakan endpoint /users (karena sudah terbukti berhasil)
       console.log('Fetching data dari /users');
       const usersRes = await api.get('/users');
-      const users = Array.isArray(usersRes.data) 
-        ? usersRes.data 
-        : (usersRes.data.data || usersRes.data || []);
-      
+      const users = Array.isArray(usersRes.data)
+        ? usersRes.data
+        : usersRes.data.data || usersRes.data || [];
+
       const selectedUser = users.find((u: any) => u.id === Number(userId));
-      
+
       if (selectedUser) {
         console.log('User ditemukan:', selectedUser.name);
         setUserName(selectedUser.name || userName);
         setNomorAnggota(selectedUser.nomor_anggota || '');
-        
+
         const kenaikanList = selectedUser.kenaikan_tingkats || [];
-        console.log('Jumlah kenaikan:', kenaikanList.length);
-        setData(kenaikanList);
+        
+        // Urutkan berdasarkan urutan tingkatan (descending)
+        // Jika urutan sama, prioritaskan yang LULUS
+        const sortedKenaikan = [...kenaikanList].sort((a: any, b: any) => {
+          const urutanA = a.tingkatan?.urutan ?? 0;
+          const urutanB = b.tingkatan?.urutan ?? 0;
+          
+          // Jika urutan berbeda, urutkan berdasarkan urutan (descending)
+          if (urutanA !== urutanB) {
+            return urutanB - urutanA;
+          }
+          
+          // Jika urutan sama, prioritaskan yang LULUS
+          if (a.status === 'lulus' && b.status !== 'lulus') return -1;
+          if (a.status !== 'lulus' && b.status === 'lulus') return 1;
+          
+          // Jika status sama, urutkan berdasarkan tanggal terbaru
+          return new Date(b.tanggal_kenaikan).getTime() - new Date(a.tanggal_kenaikan).getTime();
+        });
+        
+        console.log('Sorted kenaikan:', sortedKenaikan.map(k => ({
+          tingkatan: k.tingkatan?.nama_tingkatan,
+          urutan: k.tingkatan?.urutan,
+          status: k.status,
+          tanggal: k.tanggal_kenaikan
+        })));
+        
+        setData(sortedKenaikan);
       } else {
         console.log('User tidak ditemukan');
         setData([]);
@@ -98,6 +118,35 @@ export default function RiwayatKenaikan() {
       fetchData();
     }, [fetchData])
   );
+
+  const handleDelete = (kenaikanId: number) => {
+    Alert.alert(
+      'Hapus Riwayat',
+      'Riwayat kenaikan ini akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(kenaikanId);
+            try {
+              await api.delete(`/kenaikan/${kenaikanId}`);
+              Alert.alert('Berhasil', 'Riwayat kenaikan berhasil dihapus');
+              await fetchData();
+            } catch (error: any) {
+              Alert.alert(
+                'Gagal',
+                error.response?.data?.message ?? 'Gagal menghapus riwayat kenaikan'
+              );
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const getInitials = (name: string) =>
     (name ?? '?')
@@ -122,14 +171,14 @@ export default function RiwayatKenaikan() {
 
   const calculateAverage = (nilai: any) => {
     const nilaiObj = parseNilai(nilai);
-    
+
     const values = [
       nilaiObj.tes_tulis,
       nilaiObj.tes_senam_jurus,
       nilaiObj.tes_mental,
       nilaiObj.kehadiran,
-    ].filter(v => v !== undefined && v !== null && v !== '');
-    
+    ].filter((v) => v !== undefined && v !== null && v !== '');
+
     if (values.length === 0) return 0;
     const sum = values.reduce((acc, val) => acc + Number(val), 0);
     return Math.round((sum / values.length) * 100) / 100;
@@ -167,12 +216,8 @@ export default function RiwayatKenaikan() {
           </View>
           <View className="flex-1">
             <Text className="text-xl font-bold text-white">{userName}</Text>
-            {nomorAnggota && (
-              <Text className="mt-0.5 text-xs text-stone-300">{nomorAnggota}</Text>
-            )}
-            <Text className="mt-0.5 text-xs text-stone-400">
-              {data.length} riwayat kenaikan
-            </Text>
+            {nomorAnggota && <Text className="mt-0.5 text-xs text-stone-300">{nomorAnggota}</Text>}
+            <Text className="mt-0.5 text-xs text-stone-400">{data.length} riwayat kenaikan</Text>
           </View>
         </View>
       </View>
@@ -195,14 +240,14 @@ export default function RiwayatKenaikan() {
           const cfg = statusConfig[item.status] ?? statusConfig.proses;
           const avg = calculateAverage(item.nilai);
           const nilaiObj = parseNilai(item.nilai);
-          
+
           return (
             <View className="mb-4">
               {/* Timeline connector */}
               {index < data.length - 1 && (
                 <View className="ml-6 h-8 w-px bg-stone-300 dark:bg-stone-700" />
               )}
-              
+
               <View className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1">
@@ -212,7 +257,7 @@ export default function RiwayatKenaikan() {
                         {item.tingkatan?.nama_tingkatan || 'Tingkatan tidak ditemukan'}
                       </Text>
                     </View>
-                    
+
                     <View className="mt-2 flex-row items-center gap-1">
                       <Ionicons name="calendar-outline" size={12} color="#a8a29e" />
                       <Text className="text-xs text-stone-500 dark:text-stone-400">
@@ -221,8 +266,21 @@ export default function RiwayatKenaikan() {
                     </View>
                   </View>
 
-                  <View className={`rounded-full px-2.5 py-1 ${cfg.bg}`}>
-                    <Text className={`text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</Text>
+                  <View className="items-end gap-2">
+                    <View className={`rounded-full px-2.5 py-1 ${cfg.bg}`}>
+                      <Text className={`text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</Text>
+                    </View>
+                    <TouchableOpacity
+                      className="h-8 w-8 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30"
+                      onPress={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      activeOpacity={0.7}>
+                      {deletingId === item.id ? (
+                        <ActivityIndicator size="small" color="#dc2626" />
+                      ) : (
+                        <Ionicons name="trash-outline" size={15} color="#dc2626" />
+                      )}
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -239,13 +297,14 @@ export default function RiwayatKenaikan() {
                         </Text>
                       </View>
                     )}
-                    {nilaiObj.tes_senam_jurus !== undefined && nilaiObj.tes_senam_jurus !== null && (
-                      <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
-                        <Text className="text-[10px] text-stone-600 dark:text-stone-300">
-                          Senam: {nilaiObj.tes_senam_jurus}
-                        </Text>
-                      </View>
-                    )}
+                    {nilaiObj.tes_senam_jurus !== undefined &&
+                      nilaiObj.tes_senam_jurus !== null && (
+                        <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
+                          <Text className="text-[10px] text-stone-600 dark:text-stone-300">
+                            Senam: {nilaiObj.tes_senam_jurus}
+                          </Text>
+                        </View>
+                      )}
                     {nilaiObj.tes_mental !== undefined && nilaiObj.tes_mental !== null && (
                       <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
                         <Text className="text-[10px] text-stone-600 dark:text-stone-300">

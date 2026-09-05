@@ -14,7 +14,7 @@ export default function CreateTingkatan() {
     try {
       await api.post('/tingkatan', { ...form, urutan: parseInt(form.urutan) });
       Alert.alert('Berhasil', 'Tingkatan ditambahkan');
-      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+      if (router.canGoBack()) { router.back(); } else { router.replace('/tingkatan'); }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
@@ -30,7 +30,7 @@ export default function CreateTingkatan() {
       {/* Header */}
       <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
+          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/tingkatan'); }}
           className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>

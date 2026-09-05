@@ -66,7 +66,7 @@ export default function EditUser() {
       if (router.canGoBack()) {
         router.back();
       } else {
-        router.replace('/');
+        router.replace('/users');
       }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
@@ -145,7 +145,7 @@ export default function EditUser() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace('/');
+              router.replace('/users');
             }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
@@ -202,7 +202,7 @@ export default function EditUser() {
               router.back();
               return;
             }
-            router.replace('/');
+            router.replace('/users');
           }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />

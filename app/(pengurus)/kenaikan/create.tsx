@@ -52,6 +52,10 @@ interface TingkatanResponse {
   semua_tingkatan: TingkatanOption[];
 }
 
+function getCurrentTingkatan(user: UserOption) {
+  return user.tingkatan ?? user.kenaikan_tingkats?.[0]?.tingkatan ?? null;
+}
+
 export default function CreateKenaikan() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [tingkatans, setTingkatans] = useState<TingkatanOption[]>([]);
@@ -199,15 +203,7 @@ export default function CreateKenaikan() {
       // Fallback: coba gunakan data dari state users
       const selectedUserData = users.find(u => u.id === userId);
       if (selectedUserData) {
-        let currentTingkatan = selectedUserData.tingkatan;
-        
-        // Jika tidak ada tingkatan langsung, cek dari kenaikan_tingkats
-        if (!currentTingkatan && selectedUserData.kenaikan_tingkats?.length > 0) {
-          const lastKenaikan = selectedUserData.kenaikan_tingkats[0];
-          if (lastKenaikan.tingkatan) {
-            currentTingkatan = lastKenaikan.tingkatan;
-          }
-        }
+        const currentTingkatan = getCurrentTingkatan(selectedUserData);
         
         if (currentTingkatan) {
           const nextTingkatan = tingkatans.find(t => t.urutan > currentTingkatan!.urutan);
@@ -282,7 +278,7 @@ export default function CreateKenaikan() {
               if (router.canGoBack()) {
                 router.back();
               } else {
-                router.replace('/');
+                router.replace('/kenaikan');
               }
             }
           }
@@ -345,7 +341,7 @@ export default function CreateKenaikan() {
               router.back();
               return;
             }
-            router.replace('/');
+            router.replace('/kenaikan');
           }}
           className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />

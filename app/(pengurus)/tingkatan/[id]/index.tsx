@@ -39,7 +39,7 @@ export default function EditTingkatan() {
     try {
       await api.put(`/tingkatan/${id}`, { ...form, urutan: parseInt(form.urutan) });
       Alert.alert('Berhasil', 'Tingkatan diperbarui');
-      if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+      if (router.canGoBack()) { router.back(); } else { router.replace('/tingkatan'); }
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
@@ -58,7 +58,7 @@ export default function EditTingkatan() {
           try {
             await api.delete(`/tingkatan/${id}`);
             Alert.alert('Dihapus', 'Tingkatan berhasil dihapus');
-            if (router.canGoBack()) { router.back(); } else { router.replace('/'); }
+            if (router.canGoBack()) { router.back(); } else { router.replace('/tingkatan'); }
           } catch (e: any) {
             Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
           } finally {
@@ -85,7 +85,7 @@ export default function EditTingkatan() {
       {/* Header */}
       <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
         <TouchableOpacity
-          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/'); }}
+          onPress={() => { if (router.canGoBack()) { router.back(); return; } router.replace('/tingkatan'); }}
           className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
         </TouchableOpacity>

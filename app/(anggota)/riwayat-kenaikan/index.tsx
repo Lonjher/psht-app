@@ -70,7 +70,7 @@ export default function RiwayatKenaikan() {
             router.back();
             return;
           }
-          router.replace('/');
+          router.replace('/(anggota)/dashboard');
         }}
         className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-stone-200 dark:bg-stone-800">
         <Ionicons name="chevron-back" size={18} color="#78716c" />

@@ -52,11 +52,38 @@ interface TingkatanResponse {
   semua_tingkatan: TingkatanOption[];
 }
 
+function getCurrentTingkatan(user: UserOption) {
+  // Prioritas 1: Cek tingkatan langsung dari user
+  if (user.tingkatan) {
+    return user.tingkatan;
+  }
+
+  // Prioritas 2: Cek dari kenaikan_tingkats yang LULUS dan urutkan berdasarkan urutan
+  if (user.kenaikan_tingkats && user.kenaikan_tingkats.length > 0) {
+    // Filter yang lulus
+    const lulusKenaikan = user.kenaikan_tingkats.filter(k => k.status === 'lulus');
+
+    if (lulusKenaikan.length > 0) {
+      // Urutkan berdasarkan urutan tingkatan (descending)
+      const sortedKenaikan = [...lulusKenaikan].sort((a, b) => {
+        const urutanA = a.tingkatan?.urutan ?? 0;
+        const urutanB = b.tingkatan?.urutan ?? 0;
+        return urutanB - urutanA;
+      });
+
+      return sortedKenaikan[0]?.tingkatan ?? null;
+    }
+  }
+
+  return null;
+}
+
 export default function CreateKenaikan() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [tingkatans, setTingkatans] = useState<TingkatanOption[]>([]);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
   const [selectedTingkatan, setSelectedTingkatan] = useState<number | null>(null);
+  const [selectedTingkatanLabel, setSelectedTingkatanLabel] = useState<string>('');
   const [tanggal, setTanggal] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [status, setStatus] = useState('proses');
@@ -80,6 +107,7 @@ export default function CreateKenaikan() {
   const resetForm = useCallback(() => {
     setSelectedUser(null);
     setSelectedTingkatan(null);
+    setSelectedTingkatanLabel('');
     setTanggal('');
     setShowDatePicker(false);
     setStatus('proses');
@@ -103,11 +131,29 @@ export default function CreateKenaikan() {
         api.get('/users?status=aktif'),
         api.get('/tingkatan'),
       ]);
-      
-      setUsers(usersRes.data);
-      // Sort tingkatan berdasarkan urutan
+
+      console.log('Users data:', JSON.stringify(usersRes.data, null, 2));
+      console.log('Tingkatan data:', JSON.stringify(tingkatanRes.data, null, 2));
+
+      // Sort tingkatan berdasarkan urutan (ascending)
       const sortedTingkatan = [...tingkatanRes.data].sort((a, b) => a.urutan - b.urutan);
       setTingkatans(sortedTingkatan);
+
+      console.log('Sorted tingkatan:', sortedTingkatan);
+
+      // Filter user yang belum mencapai tingkatan tertinggi (Putih)
+      const eligibleUsers = usersRes.data.filter((user: UserOption) => {
+        const currentTingkatan = getCurrentTingkatan(user);
+        console.log(`User ${user.name}:`, currentTingkatan);
+
+        // Jika tidak ada tingkatan, tetap tampilkan (belum ada tingkatan)
+        if (!currentTingkatan) return true;
+
+        // Jika tingkatan tertinggi adalah Putih (urutan 5), jangan tampilkan
+        return currentTingkatan.nama_tingkatan?.trim().toLowerCase() !== 'putih';
+      });
+
+      setUsers(eligibleUsers);
     } catch (error) {
       console.error('Error loading initial data:', error);
     }
@@ -118,10 +164,10 @@ export default function CreateKenaikan() {
     useCallback(() => {
       // Reset form setiap kali halaman mendapat fokus
       resetForm();
-      
+
       // Muat ulang data
       loadInitialData();
-      
+
       // Cleanup function
       return () => {
         // Pastikan date picker tertutup saat meninggalkan halaman
@@ -138,15 +184,15 @@ export default function CreateKenaikan() {
       parseInt(nilai.tes_mental) || 0,
       parseInt(nilai.kehadiran) || 0,
     ];
-    
+
     // Filter nilai yang valid (lebih dari 0)
-    const validNilai = nilaiArray.filter(n => n > 0);
-    
+    const validNilai = nilaiArray.filter((n) => n > 0);
+
     if (validNilai.length > 0) {
       const avg = validNilai.reduce((sum, n) => sum + n, 0) / validNilai.length;
       const roundedAvg = Math.round(avg * 100) / 100;
       setRataRata(roundedAvg);
-      
+
       // Set status otomatis berdasarkan rata-rata
       if (roundedAvg < 60) {
         setStatus('tidak_lulus');
@@ -162,80 +208,57 @@ export default function CreateKenaikan() {
   const handleUserChange = async (userId: number | null) => {
     setSelectedUser(userId);
     setSelectedTingkatan(null);
+    setSelectedTingkatanLabel('');
     setInfoTingkatan(null);
-    
+
     if (!userId) return;
-    
+
     setLoadingTingkatan(true);
     try {
-      // Gunakan endpoint khusus untuk mendapatkan tingkatan berikutnya
-      const response = await api.get<TingkatanResponse>(`/users/${userId}/tingkatan-berikutnya`);
-      console.log('Tingkatan response:', response.data);
-      
-      const data = response.data;
-      
-      // Set tingkatan berikutnya secara otomatis
-      if (data.tingkatan_berikutnya) {
-        setSelectedTingkatan(data.tingkatan_berikutnya.id);
+      // Cari user yang dipilih
+      const selectedUserData = users.find((u) => u.id === userId);
+
+      if (!selectedUserData) {
+        Alert.alert('Error', 'Data user tidak ditemukan');
+        return;
+      }
+
+      // Dapatkan tingkatan saat ini dari data user
+      const currentTingkatan = getCurrentTingkatan(selectedUserData);
+
+      console.log('Current tingkatan:', currentTingkatan);
+
+      // Tentukan tingkatan berikutnya
+      let nextTingkatan = null;
+
+      if (!currentTingkatan) {
+        // Jika belum ada tingkatan, pilih yang pertama (Polos)
+        nextTingkatan = tingkatans.length > 0 ? tingkatans[0] : null;
+      } else {
+        // Cari tingkatan berikutnya berdasarkan urutan
+        nextTingkatan = tingkatans.find((t) => t.urutan > currentTingkatan.urutan) || null;
+      }
+
+      console.log('Next tingkatan:', nextTingkatan);
+
+      if (nextTingkatan) {
+        setSelectedTingkatan(nextTingkatan.id);
+        setSelectedTingkatanLabel(nextTingkatan.nama_tingkatan);
         setInfoTingkatan({
-          sekarang: data.tingkatan_sekarang?.nama_tingkatan || 'Belum ada',
-          berikutnya: data.tingkatan_berikutnya.nama_tingkatan,
+          sekarang: currentTingkatan?.nama_tingkatan || 'Belum ada',
+          berikutnya: nextTingkatan.nama_tingkatan,
         });
       } else {
         // Jika tidak ada tingkatan berikutnya (sudah paling tinggi)
-        Alert.alert(
-          'Info',
-          'Anggota ini sudah berada di tingkatan tertinggi',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Info', 'Anggota ini sudah berada di tingkatan tertinggi', [{ text: 'OK' }]);
         setInfoTingkatan({
-          sekarang: data.tingkatan_sekarang?.nama_tingkatan || 'Tidak diketahui',
+          sekarang: currentTingkatan?.nama_tingkatan || 'Tidak diketahui',
           berikutnya: 'Sudah tertinggi',
         });
       }
     } catch (error: any) {
-      console.error('Error fetching tingkatan:', error);
-      
-      // Fallback: coba gunakan data dari state users
-      const selectedUserData = users.find(u => u.id === userId);
-      if (selectedUserData) {
-        let currentTingkatan = selectedUserData.tingkatan;
-        
-        // Jika tidak ada tingkatan langsung, cek dari kenaikan_tingkats
-        if (!currentTingkatan && selectedUserData.kenaikan_tingkats?.length > 0) {
-          const lastKenaikan = selectedUserData.kenaikan_tingkats[0];
-          if (lastKenaikan.tingkatan) {
-            currentTingkatan = lastKenaikan.tingkatan;
-          }
-        }
-        
-        if (currentTingkatan) {
-          const nextTingkatan = tingkatans.find(t => t.urutan > currentTingkatan!.urutan);
-          if (nextTingkatan) {
-            setSelectedTingkatan(nextTingkatan.id);
-            setInfoTingkatan({
-              sekarang: currentTingkatan.nama_tingkatan,
-              berikutnya: nextTingkatan.nama_tingkatan,
-            });
-          } else {
-            setInfoTingkatan({
-              sekarang: currentTingkatan.nama_tingkatan,
-              berikutnya: 'Sudah tertinggi',
-            });
-          }
-        } else {
-          // Jika belum ada tingkatan, pilih yang pertama
-          if (tingkatans.length > 0) {
-            setSelectedTingkatan(tingkatans[0].id);
-            setInfoTingkatan({
-              sekarang: 'Belum ada',
-              berikutnya: tingkatans[0].nama_tingkatan,
-            });
-          }
-        }
-      } else {
-        Alert.alert('Error', 'Gagal memuat data tingkatan');
-      }
+      console.error('Error handling user change:', error);
+      Alert.alert('Error', 'Gagal memuat data tingkatan');
     } finally {
       setLoadingTingkatan(false);
     }
@@ -246,13 +269,13 @@ export default function CreateKenaikan() {
       Alert.alert('Lengkapi data', 'Anggota, tingkatan, dan tanggal wajib diisi');
       return;
     }
-    
+
     // Validasi nilai
     if (rataRata === null) {
       Alert.alert('Lengkapi data', 'Nilai wajib diisi minimal satu');
       return;
     }
-    
+
     setLoading(true);
     try {
       await api.post('/kenaikan', {
@@ -268,43 +291,63 @@ export default function CreateKenaikan() {
         },
         catatan,
       });
-      Alert.alert(
-        'Berhasil', 
-        'Data kenaikan disimpan',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form setelah berhasil simpan
-              resetForm();
-              
-              // Kembali ke halaman sebelumnya
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/');
-              }
+      Alert.alert('Berhasil', 'Data kenaikan disimpan', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form setelah berhasil simpan
+            resetForm();
+
+            // Kembali ke halaman sebelumnya
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/kenaikan');
             }
-          }
-        ]
-      );
+          },
+        },
+      ]);
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
       setLoading(false);
     }
   };
-
-  // Handler untuk DateTimePicker
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    // Untuk Android, date picker akan otomatis tertutup setelah memilih
+  
+  // Handler khusus untuk onValueChange
+  const onValueChange = (event: any) => {
+    console.log('onValueChange event:', event);
+    
+    let dateToUse: Date | undefined;
+    
+    // Cek jika event adalah Date object langsung
+    if (event instanceof Date) {
+      dateToUse = event;
+    } 
+    // Cek jika event memiliki nativeEvent.timestamp
+    else if (event?.nativeEvent?.timestamp) {
+      dateToUse = new Date(event.nativeEvent.timestamp);
+    }
+    // Cek jika event memiliki timestamp langsung
+    else if (event?.timestamp) {
+      dateToUse = new Date(event.timestamp);
+    }
+    
+    console.log('Date to use:', dateToUse);
+    
+    // Untuk Android, tutup picker setelah memilih
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
     
-    if (event.type === 'set' && selectedDate) {
-      const isoDate = selectedDate.toISOString().split('T')[0];
-      setTanggal(isoDate);
+    if (dateToUse) {
+      const year = dateToUse.getFullYear();
+      const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
+      const day = String(dateToUse.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      
+      console.log('Formatted date:', formattedDate);
+      setTanggal(formattedDate);
     }
   };
 
@@ -345,7 +388,7 @@ export default function CreateKenaikan() {
               router.back();
               return;
             }
-            router.replace('/');
+            router.replace('/kenaikan');
           }}
           className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
           <Ionicons name="chevron-back" size={18} color="#ffffff" />
@@ -372,13 +415,21 @@ export default function CreateKenaikan() {
               style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
               dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
               <Picker.Item label="Pilih Anggota..." value={null} />
-              {users.map((u) => (
-                <Picker.Item
-                  key={u.id}
-                  label={u.nomor_anggota ? `${u.nomor_anggota} - ${u.name}` : u.name}
-                  value={u.id}
-                />
-              ))}
+              {users.map((u) => {
+                const currentTingkatan = getCurrentTingkatan(u);
+                const tingkatanLabel = currentTingkatan?.nama_tingkatan || 'Belum ada';
+                return (
+                  <Picker.Item
+                    key={u.id}
+                    label={
+                      u.nomor_anggota
+                        ? `${u.nomor_anggota} - ${u.name} [${tingkatanLabel}]`
+                        : `${u.name} [${tingkatanLabel}]`
+                    }
+                    value={u.id}
+                  />
+                );
+              })}
             </Picker>
           </View>
 
@@ -394,51 +445,67 @@ export default function CreateKenaikan() {
             </View>
           )}
 
-          <FieldLabel text="TINGKATAN" />
-          <View className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800">
+          <FieldLabel text="TINGKATAN TUJUAN" />
+          <View className="mb-4 flex-row items-center rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800">
             {loadingTingkatan ? (
-              <View className="h-12 items-center justify-center">
-                <ActivityIndicator size="small" color={isDark ? '#fbbf24' : '#b45309'} />
-              </View>
+              <ActivityIndicator size="small" color={isDark ? '#fbbf24' : '#b45309'} />
             ) : (
-              <Picker
-                selectedValue={selectedTingkatan}
-                onValueChange={setSelectedTingkatan}
-                enabled={!loadingTingkatan}
-                style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
-                dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
-                <Picker.Item label="Pilih Tingkatan..." value={null} />
-                {tingkatans.map((t) => (
-                  <Picker.Item 
-                    key={t.id} 
-                    label={t.nama_tingkatan} 
-                    value={t.id} 
-                  />
-                ))}
-              </Picker>
+              <>
+                <Ionicons
+                  name="ribbon-outline"
+                  size={16}
+                  color={isDark ? '#a8a29e' : '#78716c'}
+                />
+                <Text
+                  className={`ml-2 flex-1 text-sm ${selectedTingkatanLabel
+                      ? 'font-semibold text-stone-800 dark:text-stone-100'
+                      : 'text-stone-400'
+                    }`}>
+                  {selectedTingkatanLabel || 'Pilih anggota terlebih dahulu'}
+                </Text>
+              </>
             )}
           </View>
 
           <FieldLabel text="TANGGAL KENAIKAN" />
           <TouchableOpacity
             className="mb-1 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
-            onPress={() => setShowDatePicker(true)}>
-            <Text
-              className={`text-sm ${
-                tanggal ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
-              }`}>
-              {tanggal || 'Pilih tanggal kenaikan'}
-            </Text>
+            onPress={() => {
+              console.log('Opening date picker...');
+              setShowDatePicker(true);
+            }}>
+            <View className="flex-row items-center justify-between">
+              <Text
+                className={`text-sm ${tanggal ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                  }`}>
+                {tanggal || 'Pilih tanggal kenaikan'}
+              </Text>
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={isDark ? '#a8a29e' : '#78716c'}
+              />
+            </View>
           </TouchableOpacity>
-          
-          {/* DateTimePicker hanya dirender ketika showDatePicker true */}
+
           {showDatePicker && (
-            <DateTimePicker
-              value={tanggal ? new Date(tanggal) : new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onValueChange={onDateChange}
-            />
+            <View>
+              <DateTimePicker
+                value={tanggal ? new Date(tanggal + 'T00:00:00') : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onValueChange={onValueChange}
+              />
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
+                  onPress={() => setShowDatePicker(false)}>
+                  <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
+                    Selesai
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
 
@@ -447,25 +514,29 @@ export default function CreateKenaikan() {
           <Text className="mb-3 text-sm font-bold text-stone-800 dark:text-stone-100">
             Penilaian
           </Text>
-          
+
           {/* Info Rata-rata */}
           {rataRata !== null && (
-            <View className={`mb-3 rounded-lg p-3 ${
-              rataRata < 60 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'
-            }`}>
-              <Text className={`text-sm font-bold ${
-                rataRata < 60 ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'
-              }`}>
+            <View
+              className={`mb-3 rounded-lg p-3 ${rataRata < 60 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'
+                }`}>
+              <Text
+                className={`text-sm font-bold ${rataRata < 60
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-green-700 dark:text-green-400'
+                  }`}>
                 Rata-rata: {rataRata}
               </Text>
-              <Text className={`text-xs mt-1 ${
-                rataRata < 60 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-              }`}>
+              <Text
+                className={`mt-1 text-xs ${rataRata < 60
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-green-600 dark:text-green-400'
+                  }`}>
                 Status: {getStatusLabel(status)}
               </Text>
             </View>
           )}
-          
+
           <View className="-mx-1.5 flex-row flex-wrap">
             <NilaiInput
               label="Tes Tulis"
@@ -505,19 +576,6 @@ export default function CreateKenaikan() {
             onChangeText={setCatatan}
           />
 
-          {/* <FieldLabel text="STATUS" />
-          <View className="mb-1 overflow-hidden rounded-xl border border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800">
-            <Picker
-              selectedValue={status}
-              onValueChange={setStatus}
-              style={{ color: isDark ? '#f5f5f4' : '#1c1917' }}
-              dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
-              <Picker.Item label="Proses" value="proses" />
-              <Picker.Item label="Lulus" value="lulus" />
-              <Picker.Item label="Tidak Lulus" value="tidak_lulus" />
-            </Picker>
-          </View> */}
-          
           {/* Info status otomatis */}
           {rataRata !== null && (
             <Text className={`mt-2 text-xs ${getStatusColor(status)}`}>

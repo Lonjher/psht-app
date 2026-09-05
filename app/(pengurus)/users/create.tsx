@@ -190,7 +190,7 @@ export default function CreateUser() {
       if (router.canGoBack()) {
         router.back();
       } else {
-        router.replace('/');
+        router.replace('/users');
       }
       generateNumber();
     } catch (e: any) {
@@ -252,7 +252,7 @@ export default function CreateUser() {
                 router.back();
                 return;
               }
-              router.replace('/');
+              router.replace('/users');
             }}
             className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
