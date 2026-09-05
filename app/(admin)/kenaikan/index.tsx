@@ -39,7 +39,7 @@ export default function ListKenaikan() {
     try {
       const res = await api.get('/users');
       const users = res.data;
-      
+
       // Transform data untuk menampilkan user dengan info kenaikan
       const usersWithKenaikan = users.map((user: any) => ({
         id: user.id,
@@ -50,7 +50,7 @@ export default function ListKenaikan() {
         kenaikan_terakhir: user.kenaikan_terakhir || null,
         tingkatan: user.tingkatan || null,
       }));
-      
+
       setData(usersWithKenaikan);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -66,7 +66,8 @@ export default function ListKenaikan() {
   );
 
   const filtered = data.filter((item) => {
-    const matchQuery = item.name.toLowerCase().includes(query.toLowerCase()) ||
+    const matchQuery =
+      item.name.toLowerCase().includes(query.toLowerCase()) ||
       (item.nomor_anggota ?? '').toLowerCase().includes(query.toLowerCase());
     return matchQuery;
   });
@@ -181,18 +182,17 @@ export default function ListKenaikan() {
         renderItem={({ item }) => {
           const lastStatus = item.kenaikan_terakhir?.status;
           const statusCfg = lastStatus ? statusConfig[lastStatus] : null;
-          
+
           return (
             <TouchableOpacity
               className="mb-3 flex-row items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none"
               onPress={() => {
-                console.log('Navigasi ke riwayat dengan userId:', item.id);
                 router.push({
-                  pathname: '/kenaikan/riwayat/[id]',  // Perhatikan: gunakan [id] bukan [userId]
-                  params: { 
-                    id: item.id,  // Perhatikan: gunakan id bukan userId
-                    name: item.name 
-                  }
+                  pathname: '/kenaikan/riwayat/[id]', // Perhatikan: gunakan [id] bukan [userId]
+                  params: {
+                    id: item.id, // Perhatikan: gunakan id bukan userId
+                    name: item.name,
+                  },
                 });
               }}
               activeOpacity={0.7}>
@@ -218,9 +218,9 @@ export default function ListKenaikan() {
                       {item.total_kenaikan}x kenaikan
                     </Text>
                   </View>
-                  
+
                   <View className="h-1 w-1 rounded-full bg-stone-400" />
-                  
+
                   <View className="flex-row items-center gap-1">
                     <Ionicons name="ribbon-outline" size={11} color="#a8a29e" />
                     <Text className="text-xs text-stone-500 dark:text-stone-400">
@@ -237,7 +237,7 @@ export default function ListKenaikan() {
                   </Text>
                 </View>
               )}
-              
+
               <Ionicons name="chevron-forward" size={16} color="#a8a29e" />
             </TouchableOpacity>
           );

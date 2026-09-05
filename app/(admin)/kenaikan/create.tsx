@@ -103,7 +103,7 @@ export default function CreateKenaikan() {
         api.get('/users?status=aktif'),
         api.get('/tingkatan'),
       ]);
-      
+
       setUsers(usersRes.data);
       // Sort tingkatan berdasarkan urutan
       const sortedTingkatan = [...tingkatanRes.data].sort((a, b) => a.urutan - b.urutan);
@@ -118,10 +118,10 @@ export default function CreateKenaikan() {
     useCallback(() => {
       // Reset form setiap kali halaman mendapat fokus
       resetForm();
-      
+
       // Muat ulang data
       loadInitialData();
-      
+
       // Cleanup function
       return () => {
         // Pastikan date picker tertutup saat meninggalkan halaman
@@ -138,15 +138,15 @@ export default function CreateKenaikan() {
       parseInt(nilai.tes_mental) || 0,
       parseInt(nilai.kehadiran) || 0,
     ];
-    
+
     // Filter nilai yang valid (lebih dari 0)
-    const validNilai = nilaiArray.filter(n => n > 0);
-    
+    const validNilai = nilaiArray.filter((n) => n > 0);
+
     if (validNilai.length > 0) {
       const avg = validNilai.reduce((sum, n) => sum + n, 0) / validNilai.length;
       const roundedAvg = Math.round(avg * 100) / 100;
       setRataRata(roundedAvg);
-      
+
       // Set status otomatis berdasarkan rata-rata
       if (roundedAvg < 60) {
         setStatus('tidak_lulus');
@@ -163,17 +163,15 @@ export default function CreateKenaikan() {
     setSelectedUser(userId);
     setSelectedTingkatan(null);
     setInfoTingkatan(null);
-    
+
     if (!userId) return;
-    
+
     setLoadingTingkatan(true);
     try {
       // Gunakan endpoint khusus untuk mendapatkan tingkatan berikutnya
       const response = await api.get<TingkatanResponse>(`/users/${userId}/tingkatan-berikutnya`);
-      console.log('Tingkatan response:', response.data);
-      
       const data = response.data;
-      
+
       // Set tingkatan berikutnya secara otomatis
       if (data.tingkatan_berikutnya) {
         setSelectedTingkatan(data.tingkatan_berikutnya.id);
@@ -183,11 +181,7 @@ export default function CreateKenaikan() {
         });
       } else {
         // Jika tidak ada tingkatan berikutnya (sudah paling tinggi)
-        Alert.alert(
-          'Info',
-          'Anggota ini sudah berada di tingkatan tertinggi',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Info', 'Anggota ini sudah berada di tingkatan tertinggi', [{ text: 'OK' }]);
         setInfoTingkatan({
           sekarang: data.tingkatan_sekarang?.nama_tingkatan || 'Tidak diketahui',
           berikutnya: 'Sudah tertinggi',
@@ -195,12 +189,12 @@ export default function CreateKenaikan() {
       }
     } catch (error: any) {
       console.error('Error fetching tingkatan:', error);
-      
+
       // Fallback: coba gunakan data dari state users
-      const selectedUserData = users.find(u => u.id === userId);
+      const selectedUserData = users.find((u) => u.id === userId);
       if (selectedUserData) {
         let currentTingkatan = selectedUserData.tingkatan;
-        
+
         // Jika tidak ada tingkatan langsung, cek dari kenaikan_tingkats
         if (!currentTingkatan && selectedUserData.kenaikan_tingkats?.length > 0) {
           const lastKenaikan = selectedUserData.kenaikan_tingkats[0];
@@ -208,9 +202,9 @@ export default function CreateKenaikan() {
             currentTingkatan = lastKenaikan.tingkatan;
           }
         }
-        
+
         if (currentTingkatan) {
-          const nextTingkatan = tingkatans.find(t => t.urutan > currentTingkatan!.urutan);
+          const nextTingkatan = tingkatans.find((t) => t.urutan > currentTingkatan!.urutan);
           if (nextTingkatan) {
             setSelectedTingkatan(nextTingkatan.id);
             setInfoTingkatan({
@@ -246,13 +240,13 @@ export default function CreateKenaikan() {
       Alert.alert('Lengkapi data', 'Anggota, tingkatan, dan tanggal wajib diisi');
       return;
     }
-    
+
     // Validasi nilai
     if (rataRata === null) {
       Alert.alert('Lengkapi data', 'Nilai wajib diisi minimal satu');
       return;
     }
-    
+
     setLoading(true);
     try {
       await api.post('/kenaikan', {
@@ -268,26 +262,22 @@ export default function CreateKenaikan() {
         },
         catatan,
       });
-      Alert.alert(
-        'Berhasil', 
-        'Data kenaikan disimpan',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form setelah berhasil simpan
-              resetForm();
-              
-              // Kembali ke halaman sebelumnya
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/');
-              }
+      Alert.alert('Berhasil', 'Data kenaikan disimpan', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form setelah berhasil simpan
+            resetForm();
+
+            // Kembali ke halaman sebelumnya
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
             }
-          }
-        ]
-      );
+          },
+        },
+      ]);
     } catch (e: any) {
       Alert.alert('Gagal', e.response?.data?.message ?? 'Error');
     } finally {
@@ -296,15 +286,24 @@ export default function CreateKenaikan() {
   };
 
   // Handler untuk DateTimePicker
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    // Untuk Android, date picker akan otomatis tertutup setelah memilih
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
+  const handleDateChange = (eventOrDate: any, maybeDate?: Date) => {
+    let selectedDate: Date | undefined;
+
+    // Jika hanya satu argumen (date) dikirim
+    if (maybeDate === undefined && eventOrDate instanceof Date) {
+      selectedDate = eventOrDate;
+    } else {
+      selectedDate = maybeDate;
     }
-    
-    if (event.type === 'set' && selectedDate) {
+
+    if (selectedDate) {
       const isoDate = selectedDate.toISOString().split('T')[0];
       setTanggal(isoDate);
+    }
+
+    // Tutup picker di Android setelah pemilihan
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
     }
   };
 
@@ -409,11 +408,7 @@ export default function CreateKenaikan() {
                 dropdownIconColor={isDark ? '#d6d3d1' : '#78716c'}>
                 <Picker.Item label="Pilih Tingkatan..." value={null} />
                 {tingkatans.map((t) => (
-                  <Picker.Item 
-                    key={t.id} 
-                    label={t.nama_tingkatan} 
-                    value={t.id} 
-                  />
+                  <Picker.Item key={t.id} label={t.nama_tingkatan} value={t.id} />
                 ))}
               </Picker>
             )}
@@ -430,14 +425,14 @@ export default function CreateKenaikan() {
               {tanggal || 'Pilih tanggal kenaikan'}
             </Text>
           </TouchableOpacity>
-          
+
           {/* DateTimePicker hanya dirender ketika showDatePicker true */}
           {showDatePicker && (
             <DateTimePicker
               value={tanggal ? new Date(tanggal) : new Date()}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onValueChange={onDateChange}
+              onValueChange={handleDateChange}
             />
           )}
         </View>
@@ -447,25 +442,32 @@ export default function CreateKenaikan() {
           <Text className="mb-3 text-sm font-bold text-stone-800 dark:text-stone-100">
             Penilaian
           </Text>
-          
+
           {/* Info Rata-rata */}
           {rataRata !== null && (
-            <View className={`mb-3 rounded-lg p-3 ${
-              rataRata < 60 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'
-            }`}>
-              <Text className={`text-sm font-bold ${
-                rataRata < 60 ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'
+            <View
+              className={`mb-3 rounded-lg p-3 ${
+                rataRata < 60 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'
               }`}>
+              <Text
+                className={`text-sm font-bold ${
+                  rataRata < 60
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-green-700 dark:text-green-400'
+                }`}>
                 Rata-rata: {rataRata}
               </Text>
-              <Text className={`text-xs mt-1 ${
-                rataRata < 60 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-              }`}>
+              <Text
+                className={`mt-1 text-xs ${
+                  rataRata < 60
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-green-600 dark:text-green-400'
+                }`}>
                 Status: {getStatusLabel(status)}
               </Text>
             </View>
           )}
-          
+
           <View className="-mx-1.5 flex-row flex-wrap">
             <NilaiInput
               label="Tes Tulis"
@@ -517,7 +519,7 @@ export default function CreateKenaikan() {
               <Picker.Item label="Tidak Lulus" value="tidak_lulus" />
             </Picker>
           </View> */}
-          
+
           {/* Info status otomatis */}
           {rataRata !== null && (
             <Text className={`mt-2 text-xs ${getStatusColor(status)}`}>
