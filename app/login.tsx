@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,59 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Linking, // tambahkan import Linking
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
-import { setAuthSession, setAuthToken } from '@/services/authStore';
+import { router, useFocusEffect } from 'expo-router';
+import { setAuthSession, setAuthToken, hydrateAuthSession } from '@/services/authStore';
 import api from '../services/api';
 import { Button } from '~/components/ui/button';
 
 export default function Login() {
   const [email, setEmail] = useState<string>('');
-  const [res, setRes] = useState<any>(null);
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [checkingSession, setCheckingSession] = useState<boolean>(true);
+
+  // Fungsi untuk redirect ke dashboard sesuai role
+  const redirectToDashboard = (role: string) => {
+    if (role === 'ADMIN') {
+      router.replace('/(admin)/dashboard');
+    } else if (role === 'PENGURUS') {
+      router.replace('/(pengurus)/dashboard');
+    } else if (role === 'ANGGOTA') {
+      router.replace('/(anggota)/dashboard');
+    } else {
+      router.replace('/');
+    }
+  };
+
+  // Cek session saat halaman fokus
+  useFocusEffect(
+    useCallback(() => {
+      setCheckingSession(true);
+
+      const checkSession = async () => {
+        try {
+          const auth = await hydrateAuthSession();
+          
+          if (auth.token && auth.role) {
+            // User sudah login, redirect ke dashboard sesuai role
+            redirectToDashboard(auth.role);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking session:', error);
+        } finally {
+          setCheckingSession(false);
+        }
+      };
+
+      checkSession();
+    }, [])
+  );
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -32,10 +71,21 @@ export default function Login() {
   };
 
   const handleLogin = async () => {
+    // Validasi input
+    if (!email.trim()) {
+      setError('Email wajib diisi');
+      return;
+    }
+
+    if (!password) {
+      setError('Kata sandi wajib diisi');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/login', { email, password });
+      const res = await api.post('/login', { email: email.trim(), password });
       const token = res.data.token;
       const role = res.data.user.role.kode_role;
 
@@ -44,11 +94,28 @@ export default function Login() {
 
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      if (role === 'ADMIN') router.replace({ pathname: '/(admin)/dashboard' });
-      else if (role === 'PENGURUS') router.replace({ pathname: '/(pengurus)/dashboard' });
-      else router.replace({ pathname: '/(anggota)/dashboard' });
-    } catch (e) {
-      setError('Email atau kata sandi salah');
+      // Redirect ke dashboard sesuai role
+      redirectToDashboard(role);
+    } catch (e: any) {
+      console.error('Login error:', e);
+      
+      // Cek status error
+      if (e?.response?.status === 422) {
+        const serverErrors = e.response.data?.errors;
+        if (serverErrors?.email) {
+          setError(serverErrors.email[0]);
+        } else if (serverErrors?.password) {
+          setError(serverErrors.password[0]);
+        } else {
+          setError('Email atau kata sandi salah');
+        }
+      } else if (e?.response?.status === 401) {
+        setError('Email atau kata sandi salah');
+      } else if (e?.response?.status === 403) {
+        setError(e?.response?.data?.message ?? 'Akun Anda belum disetujui');
+      } else {
+        setError('Terjadi kesalahan, silakan coba lagi');
+      }
     } finally {
       setLoading(false);
     }
@@ -62,14 +129,21 @@ export default function Login() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        // Fallback: coba buka dengan browser biasa
         await Linking.openURL(url);
       }
     } catch (error) {
       console.error('Gagal membuka WhatsApp:', error);
-      // Bisa tambahkan alert atau pesan error di UI jika diperlukan
     }
   };
+
+  // Tampilkan loading saat cek session
+  if (checkingSession) {
+    return (
+      <View className="flex-1 items-center justify-center bg-stone-50 dark:bg-stone-950">
+        <ActivityIndicator size="large" color="#b45309" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

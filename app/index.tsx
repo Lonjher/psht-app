@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Link, Redirect, router, useFocusEffect } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 import { Button } from '~/components/ui/button';
@@ -21,17 +21,9 @@ export default function WelcomeGate() {
   );
   const [isChecking, setIsChecking] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
-  const splashShownRef = useRef(false); // Ref untuk melacak apakah splash sudah pernah ditampilkan
 
-  // Tampilkan splash screen hanya sekali
+  // Tampilkan splash screen setiap kali komponen di-mount (aplikasi dibuka)
   useEffect(() => {
-    if (splashShownRef.current) {
-      setShowSplash(false);
-      return;
-    }
-    
-    splashShownRef.current = true;
-    
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
     }, SPLASH_DURATION);
@@ -60,13 +52,13 @@ export default function WelcomeGate() {
     }, [])
   );
 
-  // Tampilkan SplashScreen hanya jika splash belum pernah ditampilkan
-  if (showSplash && !splashShownRef.current) {
+  // Tampilkan SplashScreen selama durasi yang ditentukan
+  if (showSplash) {
     return <SplashScreen />;
   }
 
   // Jika masih checking session, tampilkan loading
-  if (isChecking && !showSplash) {
+  if (isChecking) {
     return (
       <View className="flex-1 items-center justify-center bg-stone-50 dark:bg-stone-950">
         <ActivityIndicator size="large" color="#b45309" />
@@ -242,6 +234,17 @@ function Welcome({ session }: { session: { role: string | null; token: string | 
           </View>
         </View>
       </View>
+
+      {/* Tampilkan error jika ada */}
+      {error && (
+        <View className="mx-6 mt-2">
+          <View className="rounded-lg bg-red-50 p-2 dark:bg-red-950/30">
+            <Text className="text-center text-xs text-red-600 dark:text-red-400">
+              {error}. Menampilkan data default.
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* ===== TENTANG SECTION ===== */}
       <View className="mt-10 px-6">
