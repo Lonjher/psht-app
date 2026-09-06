@@ -17,6 +17,14 @@ export default function CekAnggota() {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
   const handleCek = async () => {
     if (!nomor.trim()) return;
     setLoading(true);
@@ -40,7 +48,7 @@ export default function CekAnggota() {
       <View className="bg-stone-800 px-6 pb-8 pt-14 dark:bg-stone-900">
         <View className="mb-6 flex-row items-center">
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={handleBack}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Text className="text-white">←</Text>
           </TouchableOpacity>

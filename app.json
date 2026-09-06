@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "psht-app",
+    "name": "PSHT App",
     "slug": "psht-app",
-    "version": "1.0.0",
+    "version": "3.5.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "psht-app",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
@@ -14,31 +14,45 @@
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+      "adaptiveIcon": {},
+      "package": "com.lonjher.pshtapp"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain"
         }
       ],
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "reactNativeAndroidArchitectures": "armeabi-v7a,arm64-v8a"
+          }
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
-      "typedRoutes": true
-    }
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d098dfd-ed0c-4595-8d69-23a513ce4871"
+      }
+    },
+    "owner": "zaidanes-team"
   }
 }

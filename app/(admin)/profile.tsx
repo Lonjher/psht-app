@@ -68,7 +68,7 @@ export default function Profile() {
       return;
     }
 
-    router.replace('/(anggota)/dashboard');
+    router.replace('/(admin)/dashboard');
   };
 
   useEffect(() => {
@@ -92,7 +92,6 @@ export default function Profile() {
   }, []);
 
   const handleUpdate = async () => {
-    // Validasi sederhana
     if (!form.name.trim()) {
       showAlert('warning', 'Data Belum Lengkap', 'Nama lengkap wajib diisi');
       return;
@@ -183,6 +182,7 @@ export default function Profile() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+
         <ScrollView
           className="flex-1 bg-stone-50 dark:bg-stone-950"
           contentContainerClassName="flex-grow"

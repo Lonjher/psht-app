@@ -68,7 +68,7 @@ export default function Profile() {
       return;
     }
 
-    router.replace('/(anggota)/dashboard');
+    router.replace('/(pengurus)/dashboard');
   };
 
   useEffect(() => {
@@ -92,7 +92,6 @@ export default function Profile() {
   }, []);
 
   const handleUpdate = async () => {
-    // Validasi sederhana
     if (!form.name.trim()) {
       showAlert('warning', 'Data Belum Lengkap', 'Nama lengkap wajib diisi');
       return;
@@ -336,6 +335,7 @@ export default function Profile() {
             <View className="h-8" />
           </View>
         </ScrollView>
+
 
       </KeyboardAvoidingView>
 

@@ -1,9 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuthToken } from './authStore';
+import { getAuthToken, hydrateAuthSession } from './authStore';
 
 const api = axios.create({
-  baseURL: 'http://10.0.2.2:8000/api', // Ganti dengan IP lokal kamu
+  baseURL: 'https://psht-api.asrildev.com/api', // Ganti dengan IP lokal kamu
   timeout: 15000,
   headers: {
     Accept: 'application/json',
@@ -13,10 +13,13 @@ const api = axios.create({
 
 // Interceptor attach token
 api.interceptors.request.use(async (config) => {
-  // Ambil dari memori dulu (lebih cepat & andal)
   let token = getAuthToken();
 
-  // Kalau tidak ada, coba dari AsyncStorage
+  if (!token) {
+    const session = await hydrateAuthSession();
+    token = session.token;
+  }
+
   if (!token) {
     token = await AsyncStorage.getItem('token');
   }
