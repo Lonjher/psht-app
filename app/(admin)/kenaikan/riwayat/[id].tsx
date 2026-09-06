@@ -1,15 +1,10 @@
 // app/(admin)/kenaikan/riwayat/[id].tsx
 import { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
+import { Alert } from '@/components/Alert';
 
 interface KenaikanDetail {
   id: number;
@@ -24,6 +19,17 @@ interface KenaikanDetail {
     nama_tingkatan: string;
     urutan: number;
   } | null;
+}
+
+interface AlertState {
+  visible: boolean;
+  variant: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  description?: string;
+  onConfirm?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  showCancel?: boolean;
 }
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
@@ -48,11 +54,45 @@ export default function RiwayatKenaikan() {
   const params = useLocalSearchParams();
   const userId = params.id as string;
   const name = params.name as string;
-  
+
   const [data, setData] = useState<KenaikanDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState(name || '');
   const [nomorAnggota, setNomorAnggota] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [alertState, setAlertState] = useState<AlertState>({
+    visible: false,
+    variant: 'info',
+    title: '',
+    description: '',
+  });
+
+  const showAlert = (
+    variant: 'success' | 'error' | 'warning' | 'info',
+    title: string,
+    description?: string,
+    options?: {
+      onConfirm?: () => void;
+      confirmText?: string;
+      cancelText?: string;
+      showCancel?: boolean;
+    }
+  ) => {
+    setAlertState({
+      visible: true,
+      variant,
+      title,
+      description,
+      onConfirm: options?.onConfirm,
+      confirmText: options?.confirmText,
+      cancelText: options?.cancelText,
+      showCancel: options?.showCancel,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertState((prev) => ({ ...prev, visible: false }));
+  };
 
   const fetchData = useCallback(async () => {
     if (!userId || userId === 'undefined') {
@@ -60,29 +100,39 @@ export default function RiwayatKenaikan() {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      // Langsung gunakan endpoint /users (karena sudah terbukti berhasil)
-      console.log('Fetching data dari /users');
       const usersRes = await api.get('/users');
-      const users = Array.isArray(usersRes.data) 
-        ? usersRes.data 
-        : (usersRes.data.data || usersRes.data || []);
-      
+      const users = Array.isArray(usersRes.data)
+        ? usersRes.data
+        : usersRes.data.data || usersRes.data || [];
+
       const selectedUser = users.find((u: any) => u.id === Number(userId));
-      
+
       if (selectedUser) {
-        console.log('User ditemukan:', selectedUser.name);
         setUserName(selectedUser.name || userName);
         setNomorAnggota(selectedUser.nomor_anggota || '');
-        
+
         const kenaikanList = selectedUser.kenaikan_tingkats || [];
-        console.log('Jumlah kenaikan:', kenaikanList.length);
-        setData(kenaikanList);
+        
+        const sortedKenaikan = [...kenaikanList].sort((a: any, b: any) => {
+          const urutanA = a.tingkatan?.urutan ?? 0;
+          const urutanB = b.tingkatan?.urutan ?? 0;
+          
+          if (urutanA !== urutanB) {
+            return urutanB - urutanA;
+          }
+          
+          if (a.status === 'lulus' && b.status !== 'lulus') return -1;
+          if (a.status !== 'lulus' && b.status === 'lulus') return 1;
+          
+          return new Date(b.tanggal_kenaikan).getTime() - new Date(a.tanggal_kenaikan).getTime();
+        });
+        
+        setData(sortedKenaikan);
       } else {
-        console.log('User tidak ditemukan');
         setData([]);
       }
     } catch (error) {
@@ -98,6 +148,48 @@ export default function RiwayatKenaikan() {
       fetchData();
     }, [fetchData])
   );
+
+  const handleEdit = (kenaikanId: number) => {
+    router.push({
+      pathname: '/kenaikan/[id]',
+      params: {
+        id: kenaikanId,
+        returnTo: 'riwayat',
+        returnId: userId,
+      },
+    });
+  };
+
+  const handleDelete = (kenaikanId: number) => {
+    showAlert(
+      'warning',
+      'Hapus Riwayat',
+      'Riwayat kenaikan ini akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+      {
+        showCancel: true,
+        confirmText: 'Hapus',
+        cancelText: 'Batal',
+        onConfirm: async () => {
+          setDeletingId(kenaikanId);
+          try {
+            await api.delete(`/kenaikan/${kenaikanId}`);
+            hideAlert();
+            showAlert('success', 'Berhasil', 'Riwayat kenaikan berhasil dihapus');
+            await fetchData();
+          } catch (error: any) {
+            hideAlert();
+            showAlert(
+              'error',
+              'Gagal',
+              error.response?.data?.message ?? 'Gagal menghapus riwayat kenaikan'
+            );
+          } finally {
+            setDeletingId(null);
+          }
+        },
+      }
+    );
+  };
 
   const getInitials = (name: string) =>
     (name ?? '?')
@@ -122,14 +214,14 @@ export default function RiwayatKenaikan() {
 
   const calculateAverage = (nilai: any) => {
     const nilaiObj = parseNilai(nilai);
-    
+
     const values = [
       nilaiObj.tes_tulis,
       nilaiObj.tes_senam_jurus,
       nilaiObj.tes_mental,
       nilaiObj.kehadiran,
-    ].filter(v => v !== undefined && v !== null && v !== '');
-    
+    ].filter((v) => v !== undefined && v !== null && v !== '');
+
     if (values.length === 0) return 0;
     const sum = values.reduce((acc, val) => acc + Number(val), 0);
     return Math.round((sum / values.length) * 100) / 100;
@@ -144,138 +236,167 @@ export default function RiwayatKenaikan() {
   }
 
   return (
-    <View className="flex-1 bg-stone-50 dark:bg-stone-950">
-      {/* Header */}
-      <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
-        <TouchableOpacity
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-              return;
-            }
-            router.replace('/kenaikan');
-          }}
-          className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
-          <Ionicons name="chevron-back" size={18} color="#ffffff" />
-        </TouchableOpacity>
+    <>
+      <View className="flex-1 bg-stone-50 dark:bg-stone-950">
+        {/* Header */}
+        <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
+          <TouchableOpacity
+            onPress={() => router.replace('/kenaikan')}
+            className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
+            <Ionicons name="chevron-back" size={18} color="#ffffff" />
+          </TouchableOpacity>
 
-        <View className="flex-row items-center gap-3">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-            <Text className="text-sm font-bold text-amber-700 dark:text-amber-500">
-              {getInitials(userName)}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-xl font-bold text-white">{userName}</Text>
-            {nomorAnggota && (
-              <Text className="mt-0.5 text-xs text-stone-300">{nomorAnggota}</Text>
-            )}
-            <Text className="mt-0.5 text-xs text-stone-400">
-              {data.length} riwayat kenaikan
-            </Text>
+          <View className="flex-row items-center gap-3">
+            <View className="h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <Text className="text-sm font-bold text-amber-700 dark:text-amber-500">
+                {getInitials(userName)}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-white">{userName}</Text>
+              {nomorAnggota && <Text className="mt-0.5 text-xs text-stone-300">{nomorAnggota}</Text>}
+              <Text className="mt-0.5 text-xs text-stone-400">{data.length} riwayat kenaikan</Text>
+            </View>
           </View>
         </View>
+
+        <FlatList
+          data={data}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          contentContainerClassName="px-5 pb-10 pt-5"
+          ListEmptyComponent={
+            <View className="mt-16 items-center px-6">
+              <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-stone-200/60 dark:bg-stone-800/60">
+                <Ionicons name="trending-up-outline" size={26} color="#a8a29e" />
+              </View>
+              <Text className="text-center text-sm leading-5 text-stone-400 dark:text-stone-600">
+                Belum ada riwayat kenaikan
+              </Text>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const cfg = statusConfig[item.status] ?? statusConfig.proses;
+            const avg = calculateAverage(item.nilai);
+            const nilaiObj = parseNilai(item.nilai);
+
+            return (
+              <View className="mb-4">
+                {index < data.length - 1 && (
+                  <View className="ml-6 h-8 w-px bg-stone-300 dark:bg-stone-700" />
+                )}
+
+                <View className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1">
+                      <View className="flex-row items-center gap-2">
+                        <View className="h-2 w-2 rounded-full bg-amber-500" />
+                        <Text className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+                          {item.tingkatan?.nama_tingkatan || 'Tingkatan tidak ditemukan'}
+                        </Text>
+                      </View>
+
+                      <View className="mt-2 flex-row items-center gap-1">
+                        <Ionicons name="calendar-outline" size={12} color="#a8a29e" />
+                        <Text className="text-xs text-stone-500 dark:text-stone-400">
+                          {item.tanggal_kenaikan || '-'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View className="items-end gap-2">
+                      <View className={`rounded-full px-2.5 py-1 ${cfg.bg}`}>
+                        <Text className={`text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</Text>
+                      </View>
+                      
+                      {/* Action Buttons */}
+                      <View className="flex-row gap-2">
+                        {/* Edit Button */}
+                        <TouchableOpacity
+                          className="h-8 w-8 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30"
+                          onPress={() => handleEdit(item.id)}
+                          activeOpacity={0.7}>
+                          <Ionicons name="pencil-outline" size={15} color="#2563eb" />
+                        </TouchableOpacity>
+                        
+                        {/* Delete Button */}
+                        <TouchableOpacity
+                          className="h-8 w-8 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30"
+                          onPress={() => handleDelete(item.id)}
+                          disabled={deletingId === item.id}
+                          activeOpacity={0.7}>
+                          {deletingId === item.id ? (
+                            <ActivityIndicator size="small" color="#dc2626" />
+                          ) : (
+                            <Ionicons name="trash-outline" size={15} color="#dc2626" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View className="mt-3 rounded-lg bg-stone-50 p-3 dark:bg-stone-800">
+                    <Text className="mb-2 text-xs font-semibold text-stone-600 dark:text-stone-300">
+                      Nilai Rata-rata: {avg}
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {nilaiObj.tes_tulis !== undefined && nilaiObj.tes_tulis !== null && (
+                        <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
+                          <Text className="text-[10px] text-stone-600 dark:text-stone-300">
+                            Tulis: {nilaiObj.tes_tulis}
+                          </Text>
+                        </View>
+                      )}
+                      {nilaiObj.tes_senam_jurus !== undefined &&
+                        nilaiObj.tes_senam_jurus !== null && (
+                          <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
+                            <Text className="text-[10px] text-stone-600 dark:text-stone-300">
+                              Senam: {nilaiObj.tes_senam_jurus}
+                            </Text>
+                          </View>
+                        )}
+                      {nilaiObj.tes_mental !== undefined && nilaiObj.tes_mental !== null && (
+                        <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
+                          <Text className="text-[10px] text-stone-600 dark:text-stone-300">
+                            Mental: {nilaiObj.tes_mental}
+                          </Text>
+                        </View>
+                      )}
+                      {nilaiObj.kehadiran !== undefined && nilaiObj.kehadiran !== null && (
+                        <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
+                          <Text className="text-[10px] text-stone-600 dark:text-stone-300">
+                            Hadir: {nilaiObj.kehadiran}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {item.catatan && (
+                    <View className="mt-2">
+                      <Text className="text-xs text-stone-500 dark:text-stone-400">
+                        Catatan: {item.catatan}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            );
+          }}
+        />
       </View>
 
-      <FlatList
-        data={data}
-        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-        contentContainerClassName="px-5 pb-10 pt-5"
-        ListEmptyComponent={
-          <View className="mt-16 items-center px-6">
-            <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-stone-200/60 dark:bg-stone-800/60">
-              <Ionicons name="trending-up-outline" size={26} color="#a8a29e" />
-            </View>
-            <Text className="text-center text-sm leading-5 text-stone-400 dark:text-stone-600">
-              Belum ada riwayat kenaikan
-            </Text>
-          </View>
-        }
-        renderItem={({ item, index }) => {
-          const cfg = statusConfig[item.status] ?? statusConfig.proses;
-          const avg = calculateAverage(item.nilai);
-          const nilaiObj = parseNilai(item.nilai);
-          
-          return (
-            <View className="mb-4">
-              {/* Timeline connector */}
-              {index < data.length - 1 && (
-                <View className="ml-6 h-8 w-px bg-stone-300 dark:bg-stone-700" />
-              )}
-              
-              <View className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <View className="h-2 w-2 rounded-full bg-amber-500" />
-                      <Text className="text-sm font-semibold text-stone-800 dark:text-stone-100">
-                        {item.tingkatan?.nama_tingkatan || 'Tingkatan tidak ditemukan'}
-                      </Text>
-                    </View>
-                    
-                    <View className="mt-2 flex-row items-center gap-1">
-                      <Ionicons name="calendar-outline" size={12} color="#a8a29e" />
-                      <Text className="text-xs text-stone-500 dark:text-stone-400">
-                        {item.tanggal_kenaikan || '-'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View className={`rounded-full px-2.5 py-1 ${cfg.bg}`}>
-                    <Text className={`text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</Text>
-                  </View>
-                </View>
-
-                {/* Nilai */}
-                <View className="mt-3 rounded-lg bg-stone-50 p-3 dark:bg-stone-800">
-                  <Text className="mb-2 text-xs font-semibold text-stone-600 dark:text-stone-300">
-                    Nilai Rata-rata: {avg}
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {nilaiObj.tes_tulis !== undefined && nilaiObj.tes_tulis !== null && (
-                      <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
-                        <Text className="text-[10px] text-stone-600 dark:text-stone-300">
-                          Tulis: {nilaiObj.tes_tulis}
-                        </Text>
-                      </View>
-                    )}
-                    {nilaiObj.tes_senam_jurus !== undefined && nilaiObj.tes_senam_jurus !== null && (
-                      <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
-                        <Text className="text-[10px] text-stone-600 dark:text-stone-300">
-                          Senam: {nilaiObj.tes_senam_jurus}
-                        </Text>
-                      </View>
-                    )}
-                    {nilaiObj.tes_mental !== undefined && nilaiObj.tes_mental !== null && (
-                      <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
-                        <Text className="text-[10px] text-stone-600 dark:text-stone-300">
-                          Mental: {nilaiObj.tes_mental}
-                        </Text>
-                      </View>
-                    )}
-                    {nilaiObj.kehadiran !== undefined && nilaiObj.kehadiran !== null && (
-                      <View className="rounded-full bg-white px-2 py-1 dark:bg-stone-700">
-                        <Text className="text-[10px] text-stone-600 dark:text-stone-300">
-                          Hadir: {nilaiObj.kehadiran}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Catatan */}
-                {item.catatan && (
-                  <View className="mt-2">
-                    <Text className="text-xs text-stone-500 dark:text-stone-400">
-                      Catatan: {item.catatan}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          );
-        }}
+      {/* Alert Modal */}
+      <Alert
+        visible={alertState.visible}
+        variant={alertState.variant}
+        title={alertState.title}
+        description={alertState.description}
+        onClose={hideAlert}
+        onConfirm={alertState.onConfirm}
+        confirmText={alertState.confirmText}
+        cancelText={alertState.cancelText}
+        showCancel={alertState.showCancel}
       />
-    </View>
+    </>
   );
 }

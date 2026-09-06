@@ -7,10 +7,12 @@
     "android": "expo start -c --android",
     "ios": "expo start -c --ios",
     "web": "expo start -c --web",
-    "clean": "rm -rf .expo node_modules"
+    "clean": "rm -rf .expo node_modules",
+    "build:preview": "eas build --platform android --profile preview && eas build:download --platform android --profile preview --output=\"PSHT App-Preview.apk\"",
+    "build:production": "eas build --platform android --profile production && eas build:download --platform android --profile production --output=\"PSHT App-Production.apk\""
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.1.1",
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-picker/picker": "2.11.4",

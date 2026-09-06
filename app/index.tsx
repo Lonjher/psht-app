@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Link, Redirect, router, useFocusEffect } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { hydrateAuthSession, setAuthToken } from '@/services/authStore';
 import { Button } from '~/components/ui/button';
 import { SplashScreen } from '~/components/SplashScreen';
@@ -12,11 +12,24 @@ interface DashboardData {
   total_tingkatan?: number;
 }
 
+// Durasi splash screen dalam milidetik
+const SPLASH_DURATION = 3000; // 3 detik
+
 export default function WelcomeGate() {
   const [session, setSession] = useState<{ role: string | null; token: string | null } | null>(
     null
   );
   const [isChecking, setIsChecking] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Tampilkan splash screen setiap kali komponen di-mount (aplikasi dibuka)
+  useEffect(() => {
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, SPLASH_DURATION);
+
+    return () => clearTimeout(splashTimer);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,10 +52,21 @@ export default function WelcomeGate() {
     }, [])
   );
 
-  if (isChecking) {
+  // Tampilkan SplashScreen selama durasi yang ditentukan
+  if (showSplash) {
     return <SplashScreen />;
   }
 
+  // Jika masih checking session, tampilkan loading
+  if (isChecking) {
+    return (
+      <View className="flex-1 items-center justify-center bg-stone-50 dark:bg-stone-950">
+        <ActivityIndicator size="large" color="#b45309" />
+      </View>
+    );
+  }
+
+  // Selalu tampilkan Welcome page
   return <Welcome session={session} />;
 }
 
@@ -210,6 +234,17 @@ function Welcome({ session }: { session: { role: string | null; token: string | 
           </View>
         </View>
       </View>
+
+      {/* Tampilkan error jika ada */}
+      {error && (
+        <View className="mx-6 mt-2">
+          <View className="rounded-lg bg-red-50 p-2 dark:bg-red-950/30">
+            <Text className="text-center text-xs text-red-600 dark:text-red-400">
+              {error}. Menampilkan data default.
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* ===== TENTANG SECTION ===== */}
       <View className="mt-10 px-6">

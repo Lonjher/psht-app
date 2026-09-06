@@ -65,13 +65,7 @@ export default function RiwayatKenaikan() {
   return (
     <View className="flex-1 bg-stone-50 px-5 pt-14 dark:bg-stone-950">
       <TouchableOpacity
-        onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-            return;
-          }
-          router.replace('/');
-        }}
+        onPress={() => router.replace('/(anggota)/dashboard')}
         className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-stone-200 dark:bg-stone-800">
         <Ionicons name="chevron-back" size={18} color="#78716c" />
       </TouchableOpacity>

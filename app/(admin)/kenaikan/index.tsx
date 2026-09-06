@@ -1,6 +1,14 @@
 // app/(admin)/kenaikan/index.tsx
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  ScrollView,
+} from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
@@ -11,6 +19,7 @@ interface UserWithKenaikan {
   nomor_anggota?: string;
   status: string;
   total_kenaikan: number;
+  tingkatan_terakhir?: string | null;
   kenaikan_terakhir?: {
     id: number;
     tingkatan_id: number;
@@ -29,27 +38,46 @@ interface UserWithKenaikan {
   } | null;
 }
 
+// Daftar tingkatan yang sudah ditentukan
+const DAFTAR_TINGKATAN = [
+  { label: 'Polos', urutan: 1 },
+  { label: 'Jambon', urutan: 2 },
+  { label: 'Hijau', urutan: 3 },
+  { label: 'Putih Kecil', urutan: 4 },
+  { label: 'Putih', urutan: 5 },
+];
+
 export default function ListKenaikan() {
   const [data, setData] = useState<UserWithKenaikan[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [selectedTingkatan, setSelectedTingkatan] = useState('semua');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/users');
+      // Ambil hanya user yang aktif
+      const res = await api.get('/users?status=aktif');
       const users = res.data;
 
-      // Transform data untuk menampilkan user dengan info kenaikan
-      const usersWithKenaikan = users.map((user: any) => ({
+      // Filter tambahan untuk memastikan hanya user aktif
+      const activeUsers = users.filter((user: UserWithKenaikan) => 
+        user.status?.toLowerCase() === 'aktif'
+      );
+
+      const usersWithKenaikan = activeUsers.map((user: UserWithKenaikan) => ({
         id: user.id,
         name: user.name,
         nomor_anggota: user.nomor_anggota,
         status: user.status,
         total_kenaikan: user.total_kenaikan || 0,
+        tingkatan_terakhir: user.tingkatan_terakhir || null,
         kenaikan_terakhir: user.kenaikan_terakhir || null,
         tingkatan: user.tingkatan || null,
       }));
+
+      console.log('Active users count:', usersWithKenaikan.length);
+      console.log('Active users:', usersWithKenaikan.map((u: UserWithKenaikan) => u.name));
 
       setData(usersWithKenaikan);
     } catch (error) {
@@ -65,13 +93,6 @@ export default function ListKenaikan() {
     }, [fetchData])
   );
 
-  const filtered = data.filter((item) => {
-    const matchQuery =
-      item.name.toLowerCase().includes(query.toLowerCase()) ||
-      (item.nomor_anggota ?? '').toLowerCase().includes(query.toLowerCase());
-    return matchQuery;
-  });
-
   const getInitials = (name: string) =>
     name
       .split(' ')
@@ -81,16 +102,48 @@ export default function ListKenaikan() {
       .toUpperCase();
 
   const getTingkatanLabel = (user: UserWithKenaikan): string => {
-    // Cek dari kenaikan terakhir
+    // Prioritas 1: Gunakan tingkatan_terakhir dari backend
+    if (user.tingkatan_terakhir && user.tingkatan_terakhir !== 'Belum ada tingkatan') {
+      return user.tingkatan_terakhir;
+    }
+    
+    // Prioritas 2: Cek dari kenaikan terakhir
     if (user.kenaikan_terakhir?.tingkatan?.nama_tingkatan) {
       return user.kenaikan_terakhir.tingkatan.nama_tingkatan;
     }
-    // Cek dari tingkatan langsung
+    
+    // Prioritas 3: Cek dari tingkatan langsung
     if (user.tingkatan?.nama_tingkatan) {
       return user.tingkatan.nama_tingkatan;
     }
-    return 'Belum ada tingkatan';
+    
+    return 'Belum ada';
   };
+
+  // Hitung jumlah anggota untuk setiap tingkatan
+  const getTingkatanCount = (label: string): number => {
+    return data.filter((user) => getTingkatanLabel(user) === label).length;
+  };
+
+  const filtered = data.filter((item) => {
+    const matchQuery =
+      item.name.toLowerCase().includes(query.toLowerCase()) ||
+      (item.nomor_anggota ?? '').toLowerCase().includes(query.toLowerCase());
+    
+    let matchTingkatan = false;
+    
+    if (selectedTingkatan === 'semua') {
+      matchTingkatan = true;
+    } else if (selectedTingkatan === 'Belum ada') {
+      // Khusus untuk filter "Belum ada"
+      const label = getTingkatanLabel(item);
+      matchTingkatan = label === 'Belum ada';
+    } else {
+      matchTingkatan = getTingkatanLabel(item) === selectedTingkatan;
+    }
+    
+    return matchQuery && matchTingkatan;
+  });
 
   const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
     lulus: {
@@ -124,13 +177,7 @@ export default function ListKenaikan() {
       <View className="bg-stone-800 px-5 pb-6 pt-14 dark:bg-stone-900">
         <View className="mb-5 flex-row items-center justify-between">
           <TouchableOpacity
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-                return;
-              }
-              router.replace('/');
-            }}
+            onPress={() => router.replace('/(admin)/dashboard')}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>
@@ -162,13 +209,77 @@ export default function ListKenaikan() {
             value={query}
             onChangeText={setQuery}
           />
+          {query !== '' && (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={16} color="#a8a29e" />
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
+
+      {/* Filter Tabs - Horizontal Scroll */}
+      <View className="mt-4">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2 px-5">
+          {/* Filter Semua */}
+          <FilterChip
+            label="Semua"
+            active={selectedTingkatan === 'semua'}
+            onPress={() => setSelectedTingkatan('semua')}
+          />
+
+          {/* Filter Tingkatan yang sudah ditentukan */}
+          {DAFTAR_TINGKATAN.map(({ label }) => {
+            const isSelected = selectedTingkatan === label;
+            
+            return (
+              <FilterChip
+                key={label}
+                label={label}
+                active={isSelected}
+                onPress={() => setSelectedTingkatan(label)}
+              />
+            );
+          })}
+
+          {/* Filter Belum ada - SELALU TAMPIL */}
+          <FilterChip
+            label="Belum ada"
+            active={selectedTingkatan === 'Belum ada'}
+            onPress={() => setSelectedTingkatan('Belum ada')}
+          />
+        </ScrollView>
+      </View>
+
+      {/* Info Jumlah Data */}
+      <View className="mt-3 flex-row items-center justify-between px-5 mb-1">
+        <Text className="text-xs text-stone-500 dark:text-stone-400">
+          Menampilkan{' '}
+          <Text className="font-bold text-stone-700 dark:text-stone-200">
+            {filtered.length}
+          </Text>{' '}
+          dari{' '}
+          <Text className="font-bold text-stone-700 dark:text-stone-200">
+            {data.length}
+          </Text>{' '}
+          anggota aktif
+        </Text>
+        {selectedTingkatan !== 'semua' && (
+          <View className="flex-row items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 dark:bg-amber-900/30">
+            <Ionicons name="ribbon-outline" size={11} color="#b45309" />
+            <Text className="text-[10px] font-semibold text-amber-700 dark:text-amber-500">
+              {selectedTingkatan}
+            </Text>
+          </View>
+        )}
       </View>
 
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerClassName="px-5 pb-10 pt-4"
+        contentContainerClassName="px-5 pb-10 pt-3"
         ListEmptyComponent={
           <View className="mt-16 items-center px-6">
             <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl bg-stone-200/60 dark:bg-stone-800/60">
@@ -188,9 +299,9 @@ export default function ListKenaikan() {
               className="mb-3 flex-row items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none"
               onPress={() => {
                 router.push({
-                  pathname: '/kenaikan/riwayat/[id]', // Perhatikan: gunakan [id] bukan [userId]
+                  pathname: '/kenaikan/riwayat/[id]',
                   params: {
-                    id: item.id, // Perhatikan: gunakan id bukan userId
+                    id: item.id,
                     name: item.name,
                   },
                 });
@@ -244,5 +355,33 @@ export default function ListKenaikan() {
         }}
       />
     </View>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className={`rounded-full px-4 py-2 ${
+        active
+          ? 'bg-stone-800 dark:bg-amber-700'
+          : 'border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
+      }`}
+      activeOpacity={0.8}>
+      <Text
+        className={`text-xs font-medium ${
+          active ? 'text-white' : 'text-stone-600 dark:text-stone-300'
+        }`}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
