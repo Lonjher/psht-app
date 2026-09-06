@@ -362,6 +362,11 @@ export default function CreateKenaikan() {
         setShowDatePicker(false);
       }
     }
+
+    // Tutup picker di Android setelah pemilihan
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
   };
 
   // Helper untuk mendapatkan label status
