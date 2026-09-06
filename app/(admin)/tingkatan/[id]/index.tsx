@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -38,10 +40,10 @@ interface AlertState {
 
 export default function EditTingkatan() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [form, setForm] = useState<TingkatanForm>({ 
-    nama_tingkatan: '', 
-    urutan: '', 
-    deskripsi: '' 
+  const [form, setForm] = useState<TingkatanForm>({
+    nama_tingkatan: '',
+    urutan: '',
+    deskripsi: ''
   });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export default function EditTingkatan() {
   // Handler untuk update field dengan validasi
   const handleFieldChange = (field: keyof TingkatanForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    
+
     const error = validateField(field, value);
     setFieldErrors((prev) => ({ ...prev, [field]: error }));
   };
@@ -136,7 +138,7 @@ export default function EditTingkatan() {
   // Validasi semua field
   const validateAllFields = (): FieldErrors => {
     const errors: FieldErrors = {};
-    
+
     (Object.keys(form) as Array<keyof TingkatanForm>).forEach((field) => {
       if (field === 'deskripsi') return; // Deskripsi opsional
       const error = validateField(field, form[field]);
@@ -144,14 +146,14 @@ export default function EditTingkatan() {
         errors[field] = error;
       }
     });
-    
+
     return errors;
   };
 
   const handleUpdate = async () => {
     const errors = validateAllFields();
     setFieldErrors(errors);
-    
+
     if (Object.keys(errors).length > 0) {
       showAlert('warning', 'Data Belum Lengkap', 'Periksa kembali kolom yang ditandai merah');
       return;
@@ -159,21 +161,21 @@ export default function EditTingkatan() {
 
     setSaving(true);
     try {
-      await api.put(`/tingkatan/${id}`, { 
-        ...form, 
+      await api.put(`/tingkatan/${id}`, {
+        ...form,
         urutan: parseInt(form.urutan),
         nama_tingkatan: form.nama_tingkatan.trim(),
         deskripsi: form.deskripsi.trim(),
       });
-      
+
       showAlert('success', 'Berhasil', 'Tingkatan berhasil diperbarui');
-      
+
       setTimeout(() => {
         router.replace('/tingkatan');
       }, 1500);
     } catch (e: any) {
       console.error('Error updating:', e);
-      
+
       const serverErrors = e.response?.data?.errors;
       if (serverErrors && typeof serverErrors === 'object') {
         const mappedErrors: FieldErrors = {};
@@ -186,7 +188,7 @@ export default function EditTingkatan() {
         });
         setFieldErrors(mappedErrors);
       }
-      
+
       showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
     } finally {
       setSaving(false);
@@ -206,10 +208,10 @@ export default function EditTingkatan() {
           setDeleting(true);
           try {
             await api.delete(`/tingkatan/${id}`);
-            
+
             hideAlert();
             showAlert('success', 'Dihapus', 'Tingkatan berhasil dihapus');
-            
+
             setTimeout(() => {
               router.replace('/tingkatan');
             }, 1500);
@@ -234,122 +236,126 @@ export default function EditTingkatan() {
 
   return (
     <>
-      <ScrollView
-        className="flex-1 bg-stone-50 dark:bg-stone-950"
-        contentContainerClassName="flex-grow"
-        keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
-          <TouchableOpacity
-            onPress={() => router.replace('/tingkatan')}
-            className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
-            <Ionicons name="chevron-back" size={18} color="#ffffff" />
-          </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
 
-          <View className="mb-3 h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/30">
-            <Text className="text-lg font-bold text-amber-700 dark:text-amber-500">
-              {form.urutan || '-'}
-            </Text>
-          </View>
-
-          <Text className="text-lg font-bold text-white">
-            {form.nama_tingkatan || 'Detail Tingkatan'}
-          </Text>
-          <Text className="mt-0.5 text-xs text-stone-300">Urutan ke-{form.urutan}</Text>
-        </View>
-
-        {/* Form Card */}
-        <View className="flex-1 px-5">
-          <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-            <Text className="mb-4 text-sm font-bold text-stone-800 dark:text-stone-100">
-              Edit Data Tingkatan
-            </Text>
-
-            {/* Nama Tingkatan */}
-            <FieldLabel text="NAMA TINGKATAN" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.nama_tingkatan
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="Contoh: Sabuk Polos"
-              placeholderTextColor="#a8a29e"
-              value={form.nama_tingkatan}
-              onChangeText={(t) => handleFieldChange('nama_tingkatan', t)}
-            />
-            <FieldErrorText message={fieldErrors.nama_tingkatan} />
-
-            {/* Urutan */}
-            <FieldLabel text="URUTAN" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.urutan
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="Contoh: 1"
-              placeholderTextColor="#a8a29e"
-              keyboardType="numeric"
-              value={form.urutan}
-              onChangeText={(t) => handleFieldChange('urutan', t)}
-            />
-            <FieldErrorText message={fieldErrors.urutan} />
-
-            {/* Deskripsi */}
-            <FieldLabel text="DESKRIPSI" optional />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.deskripsi
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="Keterangan singkat tingkatan ini"
-              placeholderTextColor="#a8a29e"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              style={{ minHeight: 80 }}
-              value={form.deskripsi}
-              onChangeText={(t) => handleFieldChange('deskripsi', t)}
-            />
-            <FieldErrorText message={fieldErrors.deskripsi} />
-
-            <Button
-              className="mt-4 w-full bg-amber-700 active:opacity-90"
-              size="lg"
-              onPress={handleUpdate}
-              disabled={saving}>
-              <Text className="font-semibold text-white">
-                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-              </Text>
-            </Button>
-          </View>
-
-          {/* Danger Zone */}
-          <View className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-5 dark:border-red-900/40 dark:bg-red-950/20">
-            <View className="mb-3 flex-row items-center gap-2">
-              <Ionicons name="warning-outline" size={16} color="#dc2626" />
-              <Text className="text-sm font-bold text-red-600 dark:text-red-400">Zona Berbahaya</Text>
-            </View>
-            <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
-              Menghapus tingkatan dapat memengaruhi data kenaikan yang terkait dengan tingkatan ini.
-            </Text>
+        <ScrollView
+          className="flex-1 bg-stone-50 dark:bg-stone-950"
+          contentContainerClassName="flex-grow"
+          keyboardShouldPersistTaps="handled">
+          {/* Header */}
+          <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
             <TouchableOpacity
-              className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
-              onPress={handleDelete}
-              disabled={deleting}
-              activeOpacity={0.7}>
-              <Ionicons name="trash-outline" size={16} color="#dc2626" />
-              <Text className="text-sm font-semibold text-red-600 dark:text-red-400">
-                {deleting ? 'Menghapus...' : 'Hapus Tingkatan'}
-              </Text>
+              onPress={() => router.replace('/tingkatan')}
+              className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
+              <Ionicons name="chevron-back" size={18} color="#ffffff" />
             </TouchableOpacity>
+
+            <View className="mb-3 h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/30">
+              <Text className="text-lg font-bold text-amber-700 dark:text-amber-500">
+                {form.urutan || '-'}
+              </Text>
+            </View>
+
+            <Text className="text-lg font-bold text-white">
+              {form.nama_tingkatan || 'Detail Tingkatan'}
+            </Text>
+            <Text className="mt-0.5 text-xs text-stone-300">Urutan ke-{form.urutan}</Text>
           </View>
 
-          <View className="h-8" />
-        </View>
-      </ScrollView>
+          {/* Form Card */}
+          <View className="flex-1 px-5">
+            <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+              <Text className="mb-4 text-sm font-bold text-stone-800 dark:text-stone-100">
+                Edit Data Tingkatan
+              </Text>
+
+              {/* Nama Tingkatan */}
+              <FieldLabel text="NAMA TINGKATAN" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.nama_tingkatan
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
+                placeholder="Contoh: Sabuk Polos"
+                placeholderTextColor="#a8a29e"
+                value={form.nama_tingkatan}
+                onChangeText={(t) => handleFieldChange('nama_tingkatan', t)}
+              />
+              <FieldErrorText message={fieldErrors.nama_tingkatan} />
+
+              {/* Urutan */}
+              <FieldLabel text="URUTAN" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.urutan
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
+                placeholder="Contoh: 1"
+                placeholderTextColor="#a8a29e"
+                keyboardType="numeric"
+                value={form.urutan}
+                onChangeText={(t) => handleFieldChange('urutan', t)}
+              />
+              <FieldErrorText message={fieldErrors.urutan} />
+
+              {/* Deskripsi */}
+              <FieldLabel text="DESKRIPSI" optional />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.deskripsi
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
+                placeholder="Keterangan singkat tingkatan ini"
+                placeholderTextColor="#a8a29e"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                style={{ minHeight: 80 }}
+                value={form.deskripsi}
+                onChangeText={(t) => handleFieldChange('deskripsi', t)}
+              />
+              <FieldErrorText message={fieldErrors.deskripsi} />
+
+              <Button
+                className="mt-4 w-full bg-amber-700 active:opacity-90"
+                size="lg"
+                onPress={handleUpdate}
+                disabled={saving}>
+                <Text className="font-semibold text-white">
+                  {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </Text>
+              </Button>
+            </View>
+
+            {/* Danger Zone */}
+            <View className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-5 dark:border-red-900/40 dark:bg-red-950/20">
+              <View className="mb-3 flex-row items-center gap-2">
+                <Ionicons name="warning-outline" size={16} color="#dc2626" />
+                <Text className="text-sm font-bold text-red-600 dark:text-red-400">Zona Berbahaya</Text>
+              </View>
+              <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
+                Menghapus tingkatan dapat memengaruhi data kenaikan yang terkait dengan tingkatan ini.
+              </Text>
+              <TouchableOpacity
+                className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
+                onPress={handleDelete}
+                disabled={deleting}
+                activeOpacity={0.7}>
+                <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                <Text className="text-sm font-semibold text-red-600 dark:text-red-400">
+                  {deleting ? 'Menghapus...' : 'Hapus Tingkatan'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="h-8" />
+          </View>
+        </ScrollView>
+
+      </KeyboardAvoidingView>
 
       {/* Alert Modal */}
       <Alert

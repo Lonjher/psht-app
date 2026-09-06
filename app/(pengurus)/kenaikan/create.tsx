@@ -316,13 +316,15 @@ export default function CreateKenaikan() {
 
   // Handler khusus untuk onValueChange
   const onValueChange = (event: any) => {
-
+    console.log('onValueChange event:', event);
+    console.log('Event type:', event?.type);
+    
     let dateToUse: Date | undefined;
-
+    
     // Cek jika event adalah Date object langsung
     if (event instanceof Date) {
       dateToUse = event;
-    }
+    } 
     // Cek jika event memiliki nativeEvent.timestamp
     else if (event?.nativeEvent?.timestamp) {
       dateToUse = new Date(event.nativeEvent.timestamp);
@@ -331,20 +333,34 @@ export default function CreateKenaikan() {
     else if (event?.timestamp) {
       dateToUse = new Date(event.timestamp);
     }
-
-
-    // Untuk Android, tutup picker setelah memilih
+    
+    // Untuk Android, tutup picker setelah event apapun (termasuk cancel)
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-
+    
+    // Untuk iOS, cek jika user membatalkan
+    if (Platform.OS === 'ios') {
+      // Jika event type adalah 'dismissed' atau user cancel
+      if (event?.type === 'dismissed' || event?.type === 'neutralButtonPressed') {
+        setShowDatePicker(false);
+        return;
+      }
+    }
+    
     if (dateToUse) {
       const year = dateToUse.getFullYear();
       const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
       const day = String(dateToUse.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
-
+      
+      console.log('Formatted date:', formattedDate);
       setTanggal(formattedDate);
+      
+      // Tutup picker untuk iOS setelah memilih
+      if (Platform.OS === 'ios') {
+        setShowDatePicker(false);
+      }
     }
   };
 
@@ -493,24 +509,28 @@ export default function CreateKenaikan() {
             </TouchableOpacity>
 
             {showDatePicker && (
-              <View>
-                <DateTimePicker
-                  value={tanggal ? new Date(tanggal + 'T00:00:00') : new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onValueChange={onValueChange}
-                />
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity
-                    className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
-                    onPress={() => setShowDatePicker(false)}>
-                    <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
-                      Selesai
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+            <View>
+              <DateTimePicker
+                value={tanggal ? new Date(tanggal + 'T00:00:00') : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onValueChange={onValueChange}
+                onDismiss={() => {
+                  console.log('Date picker dismissed');
+                  setShowDatePicker(false);
+                }}
+              />
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
+                  onPress={() => setShowDatePicker(false)}>
+                  <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
+                    Selesai
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
           </View>
 
           {/* Nilai */}

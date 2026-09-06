@@ -1,5 +1,5 @@
 // app/(admin)/users/create.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/Alert';
 
 const generateNomorAnggota = (existingNumbers: string[]): string => {
-  // Ekstrak angka dari format PSHT-XXXXXX
   const numbers = existingNumbers
     .map((num) => {
       const match = num.match(/PSHT-(\d+)/);
@@ -26,23 +25,14 @@ const generateNomorAnggota = (existingNumbers: string[]): string => {
     })
     .filter((n) => !isNaN(n) && n > 0);
 
-  console.log('Parsed numbers:', numbers);
-
-  // Jika tidak ada nomor, mulai dari 1
   if (numbers.length === 0) {
     return 'PSHT-000001';
   }
 
-  // Cari nomor tertinggi
   const maxNumber = Math.max(...numbers);
   const nextNumber = maxNumber + 1;
 
-  // Format dengan leading zeros (6 digit)
-  const formattedNumber = `PSHT-${nextNumber.toString().padStart(6, '0')}`;
-
-  console.log('Next number:', formattedNumber);
-
-  return formattedNumber;
+  return `PSHT-${nextNumber.toString().padStart(6, '0')}`;
 };
 
 type FormState = {
@@ -124,25 +114,17 @@ export default function CreateUser() {
 
   const generateNumber = async () => {
     try {
-      // Ambil semua user dengan role ANGGOTA
       const res = await api.get('/users');
       const users = res.data;
 
-      // Filter hanya yang memiliki nomor anggota dengan format PSHT-XXXXXX
       const existingNumbers = (Array.isArray(users) ? users : [])
         .map((user: any) => user.nomor_anggota)
         .filter((num: any) => num && typeof num === 'string' && /^PSHT-\d+$/.test(num));
 
-      console.log('Existing numbers:', existingNumbers);
-
-      // Generate nomor baru
       const newNumber = generateNomorAnggota(existingNumbers);
-      console.log('Generated number:', newNumber);
-
       setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
     } catch (error) {
       console.error('Error generating number:', error);
-      // Fallback: gunakan timestamp
       const timestamp = Date.now().toString().slice(-6);
       setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
     }
@@ -255,10 +237,19 @@ export default function CreateUser() {
     return mapped;
   };
 
-  // Handler khusus untuk onValueChange
+  // Handler untuk DatePicker dengan cancel handling
   const onValueChange = (event: any) => {
     console.log('onValueChange event:', event);
-
+    
+    // Cek jika user membatalkan
+    const eventType = event?.type || event?.nativeEvent?.type;
+    
+    if (eventType === 'dismissed' || eventType === 'neutralButtonPressed') {
+      console.log('User cancelled date selection');
+      setShowDatePicker(false);
+      return;
+    }
+    
     let dateToUse: Date | undefined;
 
     if (event instanceof Date) {
@@ -271,8 +262,6 @@ export default function CreateUser() {
       dateToUse = new Date(event.timestamp);
     }
 
-    console.log('Date to use:', dateToUse);
-
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
@@ -283,7 +272,6 @@ export default function CreateUser() {
       const day = String(dateToUse.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
 
-      console.log('Formatted date:', formattedDate);
       updateField('tanggal_lahir', formattedDate);
     }
   };
@@ -450,6 +438,10 @@ export default function CreateUser() {
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onValueChange={onValueChange}
+                    onDismiss={() => {
+                      console.log('Date picker dismissed');
+                      setShowDatePicker(false);
+                    }}
                   />
                   {Platform.OS === 'ios' && (
                     <TouchableOpacity

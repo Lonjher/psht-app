@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   useColorScheme,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -109,9 +110,9 @@ export default function Profile() {
         no_hp: form.no_hp.trim(),
         alamat: form.alamat.trim(),
       });
-      
+
       showAlert('success', 'Berhasil', 'Profil berhasil diperbarui');
-      
+
       setTimeout(async () => {
         setEditMode(false);
         const res = await api.get('/profile');
@@ -177,160 +178,166 @@ export default function Profile() {
 
   return (
     <>
-      <ScrollView
-        className="flex-1 bg-stone-50 dark:bg-stone-950"
-        contentContainerClassName="flex-grow"
-        keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
-          <TouchableOpacity
-            onPress={handleBack}
-            className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
-            <Ionicons name="chevron-back" size={18} color="#ffffff" />
-          </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
 
-          <View className="mb-3 h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/30">
-            <Text className="text-lg font-bold text-amber-700 dark:text-amber-500">
-              {getInitials(profile?.name)}
-            </Text>
-          </View>
+        <ScrollView
+          className="flex-1 bg-stone-50 dark:bg-stone-950"
+          contentContainerClassName="flex-grow"
+          keyboardShouldPersistTaps="handled">
+          {/* Header */}
+          <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
+            <TouchableOpacity
+              onPress={handleBack}
+              className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
+              <Ionicons name="chevron-back" size={18} color="#ffffff" />
+            </TouchableOpacity>
 
-          <Text className="text-lg font-bold text-white">{profile?.name}</Text>
-          <Text className="mt-0.5 text-xs text-stone-300">{profile?.email}</Text>
-
-          <View className="mt-3 rounded-full bg-white/10 px-3 py-1">
-            <Text className="text-xs font-medium text-white">{profile?.role?.nama_role}</Text>
-          </View>
-        </View>
-
-        <View className="flex-1 px-5">
-          {!editMode ? (
-            <>
-              {/* Info Card */}
-              <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-                <Text className="mb-3 text-sm font-bold text-stone-800 dark:text-stone-100">
-                  Informasi Akun
-                </Text>
-                <DetailRow label="No. Anggota" value={profile?.nomor_anggota ?? '-'} />
-                <DetailRow label="No. HP" value={profile?.no_hp ?? '-'} />
-                <DetailRow label="Alamat" value={profile?.alamat ?? '-'} />
-                <DetailRow label="Tgl. Lahir" value={profile?.tanggal_lahir ?? '-'} last />
-              </View>
-
-              <TouchableOpacity
-                className="mt-5 flex-row items-center justify-center gap-2 rounded-xl bg-amber-700 py-3.5"
-                onPress={() => setEditMode(true)}
-                activeOpacity={0.8}>
-                <Ionicons name="create-outline" size={16} color="#ffffff" />
-                <Text className="text-sm font-semibold text-white">Edit Profil</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-              <Text className="mb-4 text-sm font-bold text-stone-800 dark:text-stone-100">
-                Edit Profil
+            <View className="mb-3 h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/30">
+              <Text className="text-lg font-bold text-amber-700 dark:text-amber-500">
+                {getInitials(profile?.name)}
               </Text>
-
-              <FieldLabel text="NAMA LENGKAP" />
-              <TextInput
-                className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-                placeholder="Nama lengkap"
-                placeholderTextColor="#a8a29e"
-                value={form.name}
-                onChangeText={(t) => setForm({ ...form, name: t })}
-              />
-
-              <FieldLabel text="NO HP" />
-              <TextInput
-                className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-                placeholder="08xxxxxxxxxx"
-                placeholderTextColor="#a8a29e"
-                keyboardType="phone-pad"
-                maxLength={14}
-                value={form.no_hp}
-                onChangeText={(t) => setForm({ ...form, no_hp: t })}
-              />
-
-              <FieldLabel text="ALAMAT" />
-              <TextInput
-                className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
-                placeholder="Alamat lengkap"
-                placeholderTextColor="#a8a29e"
-                multiline
-                numberOfLines={2}
-                textAlignVertical="top"
-                style={{ minHeight: 60 }}
-                value={form.alamat}
-                onChangeText={(t) => setForm({ ...form, alamat: t })}
-              />
-
-              <FieldLabel text="TANGGAL LAHIR" />
-              <TouchableOpacity
-                className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
-                onPress={() => setShowDatePicker(true)}>
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    className={`text-sm ${
-                      form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
-                    }`}>
-                    {form.tanggal_lahir || 'Pilih tanggal lahir'}
-                  </Text>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={16}
-                    color={isDark ? '#a8a29e' : '#78716c'}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <View>
-                  <DateTimePicker
-                    value={
-                      form.tanggal_lahir
-                        ? new Date(form.tanggal_lahir + 'T00:00:00')
-                        : new Date()
-                    }
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange}
-                  />
-                  {Platform.OS === 'ios' && (
-                    <TouchableOpacity
-                      className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
-                      onPress={() => setShowDatePicker(false)}>
-                      <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
-                        Selesai
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              <View className="flex-row gap-3">
-                <TouchableOpacity
-                  className="flex-1 items-center justify-center rounded-xl border border-stone-200 bg-stone-50 py-3.5 dark:border-stone-700 dark:bg-stone-800"
-                  onPress={() => setEditMode(false)}
-                  activeOpacity={0.7}>
-                  <Text className="text-sm font-semibold text-stone-600 dark:text-stone-300">
-                    Batal
-                  </Text>
-                </TouchableOpacity>
-                <Button
-                  className="flex-1 bg-amber-700 active:opacity-90"
-                  onPress={handleUpdate}
-                  disabled={saving}>
-                  <Text className="text-sm font-semibold text-white">
-                    {saving ? 'Menyimpan...' : 'Simpan'}
-                  </Text>
-                </Button>
-              </View>
             </View>
-          )}
 
-          <View className="h-8" />
-        </View>
-      </ScrollView>
+            <Text className="text-lg font-bold text-white">{profile?.name}</Text>
+            <Text className="mt-0.5 text-xs text-stone-300">{profile?.email}</Text>
+
+            <View className="mt-3 rounded-full bg-white/10 px-3 py-1">
+              <Text className="text-xs font-medium text-white">{profile?.role?.nama_role}</Text>
+            </View>
+          </View>
+
+          <View className="flex-1 px-5">
+            {!editMode ? (
+              <>
+                {/* Info Card */}
+                <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+                  <Text className="mb-3 text-sm font-bold text-stone-800 dark:text-stone-100">
+                    Informasi Akun
+                  </Text>
+                  <DetailRow label="No. Anggota" value={profile?.nomor_anggota ?? '-'} />
+                  <DetailRow label="No. HP" value={profile?.no_hp ?? '-'} />
+                  <DetailRow label="Alamat" value={profile?.alamat ?? '-'} />
+                  <DetailRow label="Tgl. Lahir" value={profile?.tanggal_lahir ?? '-'} last />
+                </View>
+
+                <TouchableOpacity
+                  className="mt-5 flex-row items-center justify-center gap-2 rounded-xl bg-amber-700 py-3.5"
+                  onPress={() => setEditMode(true)}
+                  activeOpacity={0.8}>
+                  <Ionicons name="create-outline" size={16} color="#ffffff" />
+                  <Text className="text-sm font-semibold text-white">Edit Profil</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+                <Text className="mb-4 text-sm font-bold text-stone-800 dark:text-stone-100">
+                  Edit Profil
+                </Text>
+
+                <FieldLabel text="NAMA LENGKAP" />
+                <TextInput
+                  className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                  placeholder="Nama lengkap"
+                  placeholderTextColor="#a8a29e"
+                  value={form.name}
+                  onChangeText={(t) => setForm({ ...form, name: t })}
+                />
+
+                <FieldLabel text="NO HP" />
+                <TextInput
+                  className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                  placeholder="08xxxxxxxxxx"
+                  placeholderTextColor="#a8a29e"
+                  keyboardType="phone-pad"
+                  maxLength={14}
+                  value={form.no_hp}
+                  onChangeText={(t) => setForm({ ...form, no_hp: t })}
+                />
+
+                <FieldLabel text="ALAMAT" />
+                <TextInput
+                  className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                  placeholder="Alamat lengkap"
+                  placeholderTextColor="#a8a29e"
+                  multiline
+                  numberOfLines={2}
+                  textAlignVertical="top"
+                  style={{ minHeight: 60 }}
+                  value={form.alamat}
+                  onChangeText={(t) => setForm({ ...form, alamat: t })}
+                />
+
+                <FieldLabel text="TANGGAL LAHIR" />
+                <TouchableOpacity
+                  className="mb-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
+                  onPress={() => setShowDatePicker(true)}>
+                  <View className="flex-row items-center justify-between">
+                    <Text
+                      className={`text-sm ${form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                        }`}>
+                      {form.tanggal_lahir || 'Pilih tanggal lahir'}
+                    </Text>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color={isDark ? '#a8a29e' : '#78716c'}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <View>
+                    <DateTimePicker
+                      value={
+                        form.tanggal_lahir
+                          ? new Date(form.tanggal_lahir + 'T00:00:00')
+                          : new Date()
+                      }
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onDateChange}
+                    />
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity
+                        className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
+                        onPress={() => setShowDatePicker(false)}>
+                        <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
+                          Selesai
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    className="flex-1 items-center justify-center rounded-xl border border-stone-200 bg-stone-50 py-3.5 dark:border-stone-700 dark:bg-stone-800"
+                    onPress={() => setEditMode(false)}
+                    activeOpacity={0.7}>
+                    <Text className="text-sm font-semibold text-stone-600 dark:text-stone-300">
+                      Batal
+                    </Text>
+                  </TouchableOpacity>
+                  <Button
+                    className="flex-1 bg-amber-700 active:opacity-90"
+                    onPress={handleUpdate}
+                    disabled={saving}>
+                    <Text className="text-sm font-semibold text-white">
+                      {saving ? 'Menyimpan...' : 'Simpan'}
+                    </Text>
+                  </Button>
+                </View>
+              </View>
+            )}
+
+            <View className="h-8" />
+          </View>
+        </ScrollView>
+
+      </KeyboardAvoidingView>
 
       {/* Alert Modal */}
       <Alert
@@ -361,9 +368,8 @@ function DetailRow({
 }) {
   return (
     <View
-      className={`flex-row items-center justify-between py-3 ${
-        !last ? 'border-b border-stone-100 dark:border-stone-800' : ''
-      }`}>
+      className={`flex-row items-center justify-between py-3 ${!last ? 'border-b border-stone-100 dark:border-stone-800' : ''
+        }`}>
       <Text className="text-sm text-stone-500 dark:text-stone-400">{label}</Text>
       <Text className="text-sm font-medium text-stone-800 dark:text-stone-100">{value}</Text>
     </View>

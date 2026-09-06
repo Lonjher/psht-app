@@ -180,21 +180,35 @@ export default function CreatePengurus() {
   // Handler khusus untuk onValueChange
   const onValueChange = (event: any) => {
     console.log('onValueChange event:', event);
+    console.log('Event type:', event?.type);
+    
+    // Cek jika user membatalkan (cancel/dismiss)
+    const eventType = event?.type || event?.nativeEvent?.type;
+    
+    if (eventType === 'dismissed' || eventType === 'neutralButtonPressed') {
+      console.log('User cancelled date selection');
+      setShowDatePicker(false);
+      return;
+    }
     
     let dateToUse: Date | undefined;
     
+    // Cek jika event adalah Date object langsung
     if (event instanceof Date) {
       dateToUse = event;
     } 
+    // Cek jika event memiliki nativeEvent.timestamp
     else if (event?.nativeEvent?.timestamp) {
       dateToUse = new Date(event.nativeEvent.timestamp);
     }
+    // Cek jika event memiliki timestamp langsung
     else if (event?.timestamp) {
       dateToUse = new Date(event.timestamp);
     }
     
     console.log('Date to use:', dateToUse);
     
+    // Untuk Android, tutup picker setelah event apapun
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
@@ -207,6 +221,11 @@ export default function CreatePengurus() {
       
       console.log('Formatted date:', formattedDate);
       handleFieldChange('tanggal_lahir', formattedDate);
+      
+      // Tutup picker untuk iOS setelah memilih
+      if (Platform.OS === 'ios') {
+        setShowDatePicker(false);
+      }
     }
   };
 
@@ -344,7 +363,24 @@ export default function CreatePengurus() {
                     }
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onValueChange={onValueChange}
+                    onChange={(event, selectedDate) => {
+                      // Untuk Android
+                      if (Platform.OS === 'android') {
+                        if (event.type === 'set' && selectedDate) {
+                          const year = selectedDate.getFullYear();
+                          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(selectedDate.getDate()).padStart(2, '0');
+                          const formattedDate = `${year}-${month}-${day}`;
+                          handleFieldChange('tanggal_lahir', formattedDate);
+                        }
+                        // Selalu tutup picker untuk Android
+                        setShowDatePicker(false);
+                      }
+                    }}
+                    onDismiss={() => {
+                      console.log('Date picker dismissed');
+                      setShowDatePicker(false);
+                    }}
                   />
                   {Platform.OS === 'ios' && (
                     <TouchableOpacity
