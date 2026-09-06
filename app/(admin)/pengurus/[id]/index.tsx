@@ -81,11 +81,38 @@ export default function EditPengurus() {
       .get(`/pengurus/${id}`)
       .then((res) => {
         const u = res.data;
+        console.log('Data pengurus dari backend:', JSON.stringify(u, null, 2));
+        console.log('tanggal_lahir:', u.tanggal_lahir);
+        
+        // Format tanggal lahir jika perlu
+        let tanggalLahir = u.tanggal_lahir ?? '';
+        
+        // Jika tanggal_lahir adalah Date object atau format ISO
+        if (tanggalLahir && typeof tanggalLahir === 'string') {
+          // Pastikan format YYYY-MM-DD
+          if (tanggalLahir.includes('T')) {
+            tanggalLahir = tanggalLahir.split('T')[0];
+          }
+        } else if (tanggalLahir instanceof Date) {
+          const year = tanggalLahir.getFullYear();
+          const month = String(tanggalLahir.getMonth() + 1).padStart(2, '0');
+          const day = String(tanggalLahir.getDate()).padStart(2, '0');
+          tanggalLahir = `${year}-${month}-${day}`;
+        }
+        
         setForm({
-          name: u.name,
-          email: u.email,
+          name: u.name ?? '',
+          email: u.email ?? '',
           no_hp: u.no_hp ?? '',
-          tanggal_lahir: u.tanggal_lahir ?? '',
+          tanggal_lahir: tanggalLahir,
+          alamat: u.alamat ?? '',
+        });
+        
+        console.log('Form setelah set:', {
+          name: u.name ?? '',
+          email: u.email ?? '',
+          no_hp: u.no_hp ?? '',
+          tanggal_lahir: tanggalLahir,
           alamat: u.alamat ?? '',
         });
       })
@@ -191,29 +218,38 @@ export default function EditPengurus() {
   };
 
   // Handler untuk DatePicker
-  const onDateChange = (event: any, selectedDate?: Date) => {
+  const onValueChange = (event: any) => {
+    console.log('onValueChange event:', event);
+    
     let dateToUse: Date | undefined;
-
-    if (selectedDate instanceof Date) {
-      dateToUse = selectedDate;
-    } else if (event instanceof Date) {
+    
+    // Cek jika event adalah Date object langsung
+    if (event instanceof Date) {
       dateToUse = event;
-    } else if (event?.nativeEvent?.timestamp) {
+    } 
+    // Cek jika event memiliki nativeEvent.timestamp
+    else if (event?.nativeEvent?.timestamp) {
       dateToUse = new Date(event.nativeEvent.timestamp);
-    } else if (event?.timestamp) {
+    }
+    // Cek jika event memiliki timestamp langsung
+    else if (event?.timestamp) {
       dateToUse = new Date(event.timestamp);
     }
-
+    
+    console.log('Date to use:', dateToUse);
+    
+    // Untuk Android, tutup picker setelah memilih
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-
+    
     if (dateToUse) {
       const year = dateToUse.getFullYear();
       const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
       const day = String(dateToUse.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
-
+      
+      console.log('Formatted date:', formattedDate);
       setForm((prev) => ({ ...prev, tanggal_lahir: formattedDate }));
     }
   };
@@ -299,7 +335,10 @@ export default function EditPengurus() {
             <FieldLabel text="TANGGAL LAHIR" />
             <TouchableOpacity
               className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-700 dark:bg-stone-800"
-              onPress={() => setShowDatePicker(true)}>
+              onPress={() => {
+                console.log('Opening date picker...');
+                setShowDatePicker(true);
+              }}>
               <View className="flex-row items-center justify-between">
                 <Text
                   className={`text-sm ${
@@ -327,7 +366,7 @@ export default function EditPengurus() {
                   }
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onDateChange}
+                  onValueChange={onValueChange}
                 />
                 {Platform.OS === 'ios' && (
                   <TouchableOpacity

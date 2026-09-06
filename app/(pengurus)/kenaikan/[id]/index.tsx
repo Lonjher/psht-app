@@ -75,13 +75,13 @@ export default function EditKenaikan() {
   const handleBack = () => {
     if (returnTo === 'riwayat' && returnId) {
       router.replace({
-        pathname: '/(pengurus)/kenaikan/riwayat/[id]',
+        pathname: '/kenaikan/riwayat/[id]',
         params: { id: returnId },
       });
       return;
     }
 
-    router.replace('/(pengurus)/kenaikan');
+    router.replace('/kenaikan');
   };
 
   // Hitung rata-rata dan update status otomatis

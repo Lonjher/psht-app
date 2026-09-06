@@ -37,7 +37,7 @@ interface AlertState {
 }
 
 export default function EditTingkatan() {
-  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [form, setForm] = useState<TingkatanForm>({ 
     nama_tingkatan: '', 
     urutan: '', 
@@ -79,15 +79,6 @@ export default function EditTingkatan() {
 
   const hideAlert = () => {
     setAlertState((prev) => ({ ...prev, visible: false }));
-  };
-
-  const handleBack = () => {
-    if (returnTo === 'tingkatan') {
-      router.replace('/tingkatan');
-      return;
-    }
-
-    router.replace('/tingkatan');
   };
 
   useEffect(() => {
@@ -178,7 +169,7 @@ export default function EditTingkatan() {
       showAlert('success', 'Berhasil', 'Tingkatan berhasil diperbarui');
       
       setTimeout(() => {
-        handleBack();
+        router.replace('/tingkatan');
       }, 1500);
     } catch (e: any) {
       console.error('Error updating:', e);
@@ -220,7 +211,7 @@ export default function EditTingkatan() {
             showAlert('success', 'Dihapus', 'Tingkatan berhasil dihapus');
             
             setTimeout(() => {
-              handleBack();
+              router.replace('/tingkatan');
             }, 1500);
           } catch (e: any) {
             hideAlert();
@@ -250,7 +241,7 @@ export default function EditTingkatan() {
         {/* Header */}
         <View className="items-center bg-stone-800 px-5 pb-10 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={handleBack}
+            onPress={() => router.replace('/tingkatan')}
             className="absolute left-5 top-14 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

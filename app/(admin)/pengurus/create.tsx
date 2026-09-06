@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,28 +7,16 @@ import {
   ScrollView,
   Platform,
   useColorScheme,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/Alert';
 
-const generateNomorAnggota = (existingNumbers: string[]): string => {
-  const numbers = existingNumbers
-    .map((num) => {
-      const match = num.match(/PSHT-(\d+)/);
-      return match ? parseInt(match[1], 10) : 0;
-    })
-    .filter((n) => !isNaN(n));
-
-  const nextNumber = (Math.max(...numbers, 0) + 1).toString().padStart(6, '0');
-  return `PSHT-${nextNumber}`;
-};
-
 interface PengurusForm {
-  nomor_anggota: string;
   name: string;
   no_hp: string;
   email: string;
@@ -58,7 +46,6 @@ const PHONE_REGEX = /^0[0-9]{9,13}$/;
 
 export default function CreatePengurus() {
   const [form, setForm] = useState<PengurusForm>({
-    nomor_anggota: '',
     name: '',
     no_hp: '',
     email: '',
@@ -90,23 +77,29 @@ export default function CreatePengurus() {
     setAlertState((prev) => ({ ...prev, visible: false }));
   };
 
-  const generateNumber = async () => {
-    try {
-      const res = await api.get('/users');
-      const existingNumbers = (res.data as any[])
-        .map((user) => user.nomor_anggota)
-        .filter((num) => num && typeof num === 'string');
-      const newNumber = generateNomorAnggota(existingNumbers);
-      setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
-    } catch (error) {
-      const timestamp = Date.now().toString().slice(-6);
-      setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
-    }
-  };
-
-  useEffect(() => {
-    generateNumber();
+  // Reset form function
+  const resetForm = useCallback(() => {
+    setForm({
+      name: '',
+      no_hp: '',
+      email: '',
+      password: '',
+      tanggal_lahir: '',
+      alamat: '',
+    });
+    setFieldErrors({});
+    setShowPassword(false);
+    setShowDatePicker(false);
+    setLoading(false);
+    setAlertState({ visible: false, variant: 'info', title: '', description: '' });
   }, []);
+
+  // Reset form setiap kali halaman mendapat fokus
+  useFocusEffect(
+    useCallback(() => {
+      resetForm();
+    }, [resetForm])
+  );
 
   // Validasi per field
   const validateField = (field: keyof PengurusForm, value: string): string | undefined => {
@@ -175,7 +168,6 @@ export default function CreatePengurus() {
     const errors: FieldErrors = {};
     
     (Object.keys(form) as Array<keyof PengurusForm>).forEach((field) => {
-      if (field === 'nomor_anggota') return; // Skip nomor_anggota
       const error = validateField(field, form[field]);
       if (error) {
         errors[field] = error;
@@ -185,30 +177,35 @@ export default function CreatePengurus() {
     return errors;
   };
 
-  // Handler untuk DatePicker
-  const onDateChange = (event: any, selectedDate?: Date) => {
+  // Handler khusus untuk onValueChange
+  const onValueChange = (event: any) => {
+    console.log('onValueChange event:', event);
+    
     let dateToUse: Date | undefined;
-
-    if (selectedDate instanceof Date) {
-      dateToUse = selectedDate;
-    } else if (event instanceof Date) {
+    
+    if (event instanceof Date) {
       dateToUse = event;
-    } else if (event?.nativeEvent?.timestamp) {
+    } 
+    else if (event?.nativeEvent?.timestamp) {
       dateToUse = new Date(event.nativeEvent.timestamp);
-    } else if (event?.timestamp) {
+    }
+    else if (event?.timestamp) {
       dateToUse = new Date(event.timestamp);
     }
-
+    
+    console.log('Date to use:', dateToUse);
+    
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-
+    
     if (dateToUse) {
       const year = dateToUse.getFullYear();
       const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
       const day = String(dateToUse.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
-
+      
+      console.log('Formatted date:', formattedDate);
       handleFieldChange('tanggal_lahir', formattedDate);
     }
   };
@@ -225,30 +222,19 @@ export default function CreatePengurus() {
     setLoading(true);
     try {
       await api.post('/pengurus', {
-        ...form,
         name: form.name.trim(),
         email: form.email.trim(),
+        password: form.password,
         no_hp: form.no_hp.trim(),
+        tanggal_lahir: form.tanggal_lahir,
         alamat: form.alamat.trim(),
       });
       
       showAlert('success', 'Berhasil', 'Pengurus baru berhasil ditambahkan');
       
       setTimeout(() => {
-        setForm({
-          nomor_anggota: '',
-          name: '',
-          no_hp: '',
-          email: '',
-          password: '',
-          tanggal_lahir: '',
-          alamat: '',
-        });
-        setFieldErrors({});
-        
+        resetForm();
         router.replace('/pengurus');
-        
-        generateNumber();
       }, 1500);
     } catch (e: any) {
       console.error('Error saving:', e);
@@ -274,206 +260,203 @@ export default function CreatePengurus() {
 
   return (
     <>
-      <ScrollView
-        className="flex-1 bg-stone-50 dark:bg-stone-950"
-        contentContainerClassName="flex-grow"
-        keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
-          <TouchableOpacity
-            onPress={() => router.replace('/pengurus')}
-            className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
-            <Ionicons name="chevron-back" size={18} color="#ffffff" />
-          </TouchableOpacity>
-
-          <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
-            <Ionicons name="person-add-outline" size={20} color="#ffffff" />
-          </View>
-
-          <Text className="text-2xl font-bold text-white">Tambah Pengurus</Text>
-          <Text className="mt-1 text-sm text-stone-300">
-            Lengkapi data untuk mendaftarkan pengurus baru
-          </Text>
-        </View>
-
-        {/* Form Card */}
-        <View className="flex-1 px-5">
-          <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
-            {/* Nomor Anggota (read-only) */}
-            <FieldLabel text="NOMOR ANGGOTA" />
-            <TextInput
-              className="mb-4 rounded-xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:border-stone-700 dark:bg-stone-700 dark:text-stone-300"
-              placeholder="PSHT-000001"
-              placeholderTextColor="#a8a29e"
-              autoCapitalize="characters"
-              editable={false}
-              value={form.nomor_anggota}
-            />
-
-            {/* Nama Lengkap */}
-            <FieldLabel text="NAMA LENGKAP" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.name
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="Nama pengurus"
-              placeholderTextColor="#a8a29e"
-              value={form.name}
-              onChangeText={(t) => handleFieldChange('name', t)}
-            />
-            <FieldErrorText message={fieldErrors.name} />
-
-            {/* Tanggal Lahir */}
-            <FieldLabel text="TANGGAL LAHIR" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+        <ScrollView
+          className="flex-1 bg-stone-50 dark:bg-stone-950"
+          contentContainerClassName="flex-grow"
+          keyboardShouldPersistTaps="handled">
+          {/* Header */}
+          <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
             <TouchableOpacity
-              className={`mb-1 rounded-xl border px-4 py-3 ${
-                fieldErrors.tanggal_lahir
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              onPress={() => setShowDatePicker(true)}>
-              <View className="flex-row items-center justify-between">
-                <Text
-                  className={`text-sm ${
-                    form.tanggal_lahir
-                      ? 'text-stone-800 dark:text-stone-100'
-                      : 'text-stone-400'
-                  }`}>
-                  {form.tanggal_lahir || 'Pilih tanggal lahir'}
-                </Text>
-                <Ionicons
-                  name="calendar-outline"
-                  size={16}
-                  color={isDark ? '#a8a29e' : '#78716c'}
-                />
-              </View>
+              onPress={() => router.replace('/pengurus')}
+              className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
+              <Ionicons name="chevron-back" size={18} color="#ffffff" />
             </TouchableOpacity>
-            <FieldErrorText message={fieldErrors.tanggal_lahir} />
-            
-            {showDatePicker && (
-              <View>
-                <DateTimePicker
-                  value={
-                    form.tanggal_lahir
-                      ? new Date(form.tanggal_lahir + 'T00:00:00')
-                      : new Date()
-                  }
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onDateChange}
-                />
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity
-                    className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
-                    onPress={() => setShowDatePicker(false)}>
-                    <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
-                      Selesai
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
 
-            {/* Alamat Lengkap */}
-            <FieldLabel text="ALAMAT LENGKAP" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.alamat
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="Alamat lengkap"
-              placeholderTextColor="#a8a29e"
-              multiline
-              numberOfLines={2}
-              textAlignVertical="top"
-              style={{ minHeight: 60 }}
-              value={form.alamat}
-              onChangeText={(t) => handleFieldChange('alamat', t)}
-            />
-            <FieldErrorText message={fieldErrors.alamat} />
-
-            {/* No HP */}
-            <FieldLabel text="NO HP" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.no_hp
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="08xxxxxxxxxx"
-              placeholderTextColor="#a8a29e"
-              keyboardType="phone-pad"
-              maxLength={14}
-              value={form.no_hp}
-              onChangeText={(t) => handleFieldChange('no_hp', t)}
-            />
-            <FieldErrorText message={fieldErrors.no_hp} />
-
-            {/* Email */}
-            <FieldLabel text="EMAIL" />
-            <TextInput
-              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                fieldErrors.email
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}
-              placeholder="nama@email.com"
-              placeholderTextColor="#a8a29e"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={form.email}
-              onChangeText={(t) => handleFieldChange('email', t)}
-            />
-            <FieldErrorText message={fieldErrors.email} />
-
-            {/* Password */}
-            <FieldLabel text="PASSWORD" />
-            <View
-              className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
-                fieldErrors.password
-                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-              }`}>
-              <TextInput
-                className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
-                placeholder="Minimal 8 karakter"
-                placeholderTextColor="#a8a29e"
-                secureTextEntry={!showPassword}
-                value={form.password}
-                onChangeText={(t) => handleFieldChange('password', t)}
-              />
-              <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
-                <Text className="text-xs font-medium text-amber-700 dark:text-amber-500">
-                  {showPassword ? 'Sembunyikan' : 'Lihat'}
-                </Text>
-              </TouchableOpacity>
+            <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+              <Ionicons name="person-add-outline" size={20} color="#ffffff" />
             </View>
-            <FieldErrorText message={fieldErrors.password} />
 
-            <Button
-              className="mt-4 w-full bg-amber-700 active:opacity-90"
-              size="lg"
-              onPress={handleSave}
-              disabled={loading}>
-              <Text className="font-semibold text-white">
-                {loading ? 'Menyimpan...' : 'Simpan Pengurus'}
-              </Text>
-            </Button>
+            <Text className="text-2xl font-bold text-white">Tambah Pengurus</Text>
+            <Text className="mt-1 text-sm text-stone-300">
+              Lengkapi data untuk mendaftarkan pengurus baru
+            </Text>
           </View>
-        </View>
-      </ScrollView>
 
-      {/* Alert Modal */}
-      <Alert
-        visible={alertState.visible}
-        variant={alertState.variant}
-        title={alertState.title}
-        description={alertState.description}
-        onClose={hideAlert}
-      />
+          {/* Form Card */}
+          <View className="flex-1 px-5">
+            <View className="-mt-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none">
+              {/* Nama Lengkap */}
+              <FieldLabel text="NAMA LENGKAP" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                  fieldErrors.name
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}
+                placeholder="Nama pengurus"
+                placeholderTextColor="#a8a29e"
+                value={form.name}
+                onChangeText={(t) => handleFieldChange('name', t)}
+              />
+              <FieldErrorText message={fieldErrors.name} />
+
+              {/* Tanggal Lahir */}
+              <FieldLabel text="TANGGAL LAHIR" />
+              <TouchableOpacity
+                className={`mb-1 rounded-xl border px-4 py-3 ${
+                  fieldErrors.tanggal_lahir
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}
+                onPress={() => {
+                  console.log('Opening date picker...');
+                  setShowDatePicker(true);
+                }}>
+                <View className="flex-row items-center justify-between">
+                  <Text
+                    className={`text-sm ${
+                      form.tanggal_lahir
+                        ? 'text-stone-800 dark:text-stone-100'
+                        : 'text-stone-400'
+                    }`}>
+                    {form.tanggal_lahir || 'Pilih tanggal lahir'}
+                  </Text>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={16}
+                    color={isDark ? '#a8a29e' : '#78716c'}
+                  />
+                </View>
+              </TouchableOpacity>
+              <FieldErrorText message={fieldErrors.tanggal_lahir} />
+              
+              {showDatePicker && (
+                <View>
+                  <DateTimePicker
+                    value={
+                      form.tanggal_lahir
+                        ? new Date(form.tanggal_lahir + 'T00:00:00')
+                        : new Date()
+                    }
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onValueChange={onValueChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      className="mt-2 rounded-lg bg-stone-200 py-2 dark:bg-stone-700"
+                      onPress={() => setShowDatePicker(false)}>
+                      <Text className="text-center text-sm font-medium text-stone-800 dark:text-stone-100">
+                        Selesai
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Alamat Lengkap */}
+              <FieldLabel text="ALAMAT LENGKAP" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                  fieldErrors.alamat
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}
+                placeholder="Alamat lengkap"
+                placeholderTextColor="#a8a29e"
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                style={{ minHeight: 60 }}
+                value={form.alamat}
+                onChangeText={(t) => handleFieldChange('alamat', t)}
+              />
+              <FieldErrorText message={fieldErrors.alamat} />
+
+              {/* No HP */}
+              <FieldLabel text="NO HP" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                  fieldErrors.no_hp
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}
+                placeholder="08xxxxxxxxxx"
+                placeholderTextColor="#a8a29e"
+                keyboardType="phone-pad"
+                maxLength={14}
+                value={form.no_hp}
+                onChangeText={(t) => handleFieldChange('no_hp', t)}
+              />
+              <FieldErrorText message={fieldErrors.no_hp} />
+
+              {/* Email */}
+              <FieldLabel text="EMAIL" />
+              <TextInput
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                  fieldErrors.email
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}
+                placeholder="nama@email.com"
+                placeholderTextColor="#a8a29e"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={form.email}
+                onChangeText={(t) => handleFieldChange('email', t)}
+              />
+              <FieldErrorText message={fieldErrors.email} />
+
+              {/* Password */}
+              <FieldLabel text="PASSWORD" />
+              <View
+                className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
+                  fieldErrors.password
+                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                }`}>
+                <TextInput
+                  className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
+                  placeholder="Minimal 8 karakter"
+                  placeholderTextColor="#a8a29e"
+                  secureTextEntry={!showPassword}
+                  value={form.password}
+                  onChangeText={(t) => handleFieldChange('password', t)}
+                />
+                <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+                  <Text className="text-xs font-medium text-amber-700 dark:text-amber-500">
+                    {showPassword ? 'Sembunyikan' : 'Lihat'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <FieldErrorText message={fieldErrors.password} />
+
+              <Button
+                className="mt-4 w-full bg-amber-700 active:opacity-90"
+                size="lg"
+                onPress={handleSave}
+                disabled={loading}>
+                <Text className="font-semibold text-white">
+                  {loading ? 'Menyimpan...' : 'Simpan Pengurus'}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Alert Modal */}
+        <Alert
+          visible={alertState.visible}
+          variant={alertState.variant}
+          title={alertState.title}
+          description={alertState.description}
+          onClose={hideAlert}
+        />
+      </KeyboardAvoidingView>
     </>
   );
 }

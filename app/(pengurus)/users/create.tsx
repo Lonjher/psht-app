@@ -1,5 +1,5 @@
 // app/(admin)/users/create.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
   useColorScheme,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/services/api';
@@ -18,15 +18,31 @@ import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/Alert';
 
 const generateNomorAnggota = (existingNumbers: string[]): string => {
+  // Ekstrak angka dari format PSHT-XXXXXX
   const numbers = existingNumbers
     .map((num) => {
       const match = num.match(/PSHT-(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
     })
-    .filter((n) => !isNaN(n));
+    .filter((n) => !isNaN(n) && n > 0);
 
-  const nextNumber = (Math.max(...numbers, 0) + 1).toString().padStart(6, '0');
-  return `PSHT-${nextNumber}`;
+  console.log('Parsed numbers:', numbers);
+
+  // Jika tidak ada nomor, mulai dari 1
+  if (numbers.length === 0) {
+    return 'PSHT-000001';
+  }
+
+  // Cari nomor tertinggi
+  const maxNumber = Math.max(...numbers);
+  const nextNumber = maxNumber + 1;
+
+  // Format dengan leading zeros (6 digit)
+  const formattedNumber = `PSHT-${nextNumber.toString().padStart(6, '0')}`;
+
+  console.log('Next number:', formattedNumber);
+
+  return formattedNumber;
 };
 
 type FormState = {
@@ -87,6 +103,59 @@ export default function CreateUser() {
     setAlertState((prev) => ({ ...prev, visible: false }));
   };
 
+  // Reset form function
+  const resetForm = useCallback(() => {
+    setForm({
+      nomor_anggota: '',
+      name: '',
+      jenis_kelamin: '',
+      tanggal_lahir: '',
+      alamat: '',
+      no_hp: '',
+      email: '',
+      password: '',
+    });
+    setFieldErrors({});
+    setShowPassword(false);
+    setShowDatePicker(false);
+    setLoading(false);
+    setAlertState({ visible: false, variant: 'info', title: '', description: '' });
+  }, []);
+
+  const generateNumber = async () => {
+    try {
+      // Ambil semua user dengan role ANGGOTA
+      const res = await api.get('/users');
+      const users = res.data;
+
+      // Filter hanya yang memiliki nomor anggota dengan format PSHT-XXXXXX
+      const existingNumbers = (Array.isArray(users) ? users : [])
+        .map((user: any) => user.nomor_anggota)
+        .filter((num: any) => num && typeof num === 'string' && /^PSHT-\d+$/.test(num));
+
+      console.log('Existing numbers:', existingNumbers);
+
+      // Generate nomor baru
+      const newNumber = generateNomorAnggota(existingNumbers);
+      console.log('Generated number:', newNumber);
+
+      setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
+    } catch (error) {
+      console.error('Error generating number:', error);
+      // Fallback: gunakan timestamp
+      const timestamp = Date.now().toString().slice(-6);
+      setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
+    }
+  };
+
+  // Reset form dan generate nomor setiap kali halaman fokus
+  useFocusEffect(
+    useCallback(() => {
+      resetForm();
+      generateNumber();
+    }, [resetForm])
+  );
+
   // Validasi per field
   const validateField = (field: keyof FormState, value: string): string | undefined => {
     switch (field) {
@@ -102,7 +171,7 @@ export default function CreateUser() {
 
       case 'tanggal_lahir':
         if (!value) return 'Tanggal lahir wajib diisi';
-        
+
         const birthDate = new Date(value);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -110,7 +179,7 @@ export default function CreateUser() {
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
           age--;
         }
-        
+
         if (age < 5) return 'Umur minimal 5 tahun';
         if (age > 100) return 'Umur maksimal 100 tahun';
         return undefined;
@@ -148,7 +217,7 @@ export default function CreateUser() {
   // Handler untuk update field dengan validasi real-time
   const updateField = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    
+
     const error = validateField(key, value);
     setFieldErrors((prev) => ({ ...prev, [key]: error }));
   };
@@ -156,15 +225,15 @@ export default function CreateUser() {
   // Validasi semua field
   const validateAllFields = (): FieldErrors => {
     const errors: FieldErrors = {};
-    
+
     (Object.keys(form) as Array<keyof FormState>).forEach((field) => {
-      if (field === 'nomor_anggota') return; // Skip nomor_anggota
+      if (field === 'nomor_anggota') return;
       const error = validateField(field, form[field]);
       if (error) {
         errors[field] = error;
       }
     });
-    
+
     return errors;
   };
 
@@ -186,37 +255,23 @@ export default function CreateUser() {
     return mapped;
   };
 
-  const generateNumber = async () => {
-    try {
-      const res = await api.get('/users');
-      const existingNumbers = (res.data as any[])
-        .map((user) => user.nomor_anggota)
-        .filter((num) => num && typeof num === 'string');
-      const newNumber = generateNomorAnggota(existingNumbers);
-      setForm((prev) => ({ ...prev, nomor_anggota: newNumber }));
-    } catch (error) {
-      const timestamp = Date.now().toString().slice(-6);
-      setForm((prev) => ({ ...prev, nomor_anggota: `PSHT-${timestamp}` }));
-    }
-  };
+  // Handler khusus untuk onValueChange
+  const onValueChange = (event: any) => {
+    console.log('onValueChange event:', event);
 
-  useEffect(() => {
-    generateNumber();
-  }, []);
-
-  // Handler untuk DatePicker
-  const onDateChange = (event: any, selectedDate?: Date) => {
     let dateToUse: Date | undefined;
 
-    if (selectedDate instanceof Date) {
-      dateToUse = selectedDate;
-    } else if (event instanceof Date) {
+    if (event instanceof Date) {
       dateToUse = event;
-    } else if (event?.nativeEvent?.timestamp) {
+    }
+    else if (event?.nativeEvent?.timestamp) {
       dateToUse = new Date(event.nativeEvent.timestamp);
-    } else if (event?.timestamp) {
+    }
+    else if (event?.timestamp) {
       dateToUse = new Date(event.timestamp);
     }
+
+    console.log('Date to use:', dateToUse);
 
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
@@ -228,6 +283,7 @@ export default function CreateUser() {
       const day = String(dateToUse.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
 
+      console.log('Formatted date:', formattedDate);
       updateField('tanggal_lahir', formattedDate);
     }
   };
@@ -235,7 +291,7 @@ export default function CreateUser() {
   const handleSave = async () => {
     const errors = validateAllFields();
     setFieldErrors(errors);
-    
+
     if (Object.keys(errors).length > 0) {
       showAlert('warning', 'Data Belum Lengkap', 'Periksa kembali kolom yang ditandai merah');
       return;
@@ -250,29 +306,17 @@ export default function CreateUser() {
         alamat: form.alamat.trim(),
         no_hp: form.no_hp.trim(),
       });
-      
+
       showAlert('success', 'Berhasil', 'Anggota baru berhasil ditambahkan');
-      
+
       setTimeout(() => {
-        setForm({
-          nomor_anggota: '',
-          name: '',
-          jenis_kelamin: '',
-          tanggal_lahir: '',
-          alamat: '',
-          no_hp: '',
-          email: '',
-          password: '',
-        });
-        setFieldErrors({});
-        
+        resetForm();
         router.replace('/users');
-        
         generateNumber();
       }, 1500);
     } catch (e: any) {
       console.error('Error saving:', e);
-      
+
       const status = e?.response?.status;
       const data = e?.response?.data;
 
@@ -333,11 +377,10 @@ export default function CreateUser() {
               {/* Nama Lengkap */}
               <FieldLabel text="NAMA LENGKAP" />
               <TextInput
-                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                  fieldErrors.name
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.name
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
                 placeholder="Nama anggota"
                 placeholderTextColor="#a8a29e"
                 value={form.name}
@@ -348,11 +391,10 @@ export default function CreateUser() {
               {/* Jenis Kelamin */}
               <FieldLabel text="JENIS KELAMIN" />
               <View
-                className={`mb-1 overflow-hidden rounded-xl border ${
-                  fieldErrors.jenis_kelamin
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}>
+                className={`mb-1 overflow-hidden rounded-xl border ${fieldErrors.jenis_kelamin
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}>
                 <TouchableOpacity
                   className="flex-row items-center justify-between px-4 py-3"
                   onPress={() =>
@@ -362,9 +404,8 @@ export default function CreateUser() {
                     )
                   }>
                   <Text
-                    className={`text-sm ${
-                      form.jenis_kelamin ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
-                    }`}>
+                    className={`text-sm ${form.jenis_kelamin ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                      }`}>
                     {form.jenis_kelamin || 'Pilih jenis kelamin'}
                   </Text>
                   <Ionicons name="swap-horizontal-outline" size={18} color="#a8a29e" />
@@ -375,17 +416,18 @@ export default function CreateUser() {
               {/* Tanggal Lahir */}
               <FieldLabel text="TANGGAL LAHIR" />
               <TouchableOpacity
-                className={`mb-1 rounded-xl border px-4 py-3 ${
-                  fieldErrors.tanggal_lahir
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}
-                onPress={() => setShowDatePicker(true)}>
+                className={`mb-1 rounded-xl border px-4 py-3 ${fieldErrors.tanggal_lahir
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
+                onPress={() => {
+                  console.log('Opening date picker...');
+                  setShowDatePicker(true);
+                }}>
                 <View className="flex-row items-center justify-between">
                   <Text
-                    className={`text-sm ${
-                      form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
-                    }`}>
+                    className={`text-sm ${form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                      }`}>
                     {form.tanggal_lahir || 'Pilih tanggal lahir'}
                   </Text>
                   <Ionicons
@@ -396,7 +438,7 @@ export default function CreateUser() {
                 </View>
               </TouchableOpacity>
               <FieldErrorText message={fieldErrors.tanggal_lahir} />
-              
+
               {showDatePicker && (
                 <View>
                   <DateTimePicker
@@ -407,7 +449,7 @@ export default function CreateUser() {
                     }
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange}
+                    onValueChange={onValueChange}
                   />
                   {Platform.OS === 'ios' && (
                     <TouchableOpacity
@@ -424,11 +466,10 @@ export default function CreateUser() {
               {/* Alamat */}
               <FieldLabel text="ALAMAT LENGKAP" />
               <TextInput
-                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                  fieldErrors.alamat
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.alamat
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
                 placeholder="Alamat lengkap"
                 placeholderTextColor="#a8a29e"
                 multiline
@@ -443,11 +484,10 @@ export default function CreateUser() {
               {/* No HP */}
               <FieldLabel text="NO. HP" />
               <TextInput
-                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                  fieldErrors.no_hp
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.no_hp
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
                 placeholder="08xxxxxxxxxx"
                 placeholderTextColor="#a8a29e"
                 keyboardType="phone-pad"
@@ -460,11 +500,10 @@ export default function CreateUser() {
               {/* Email */}
               <FieldLabel text="EMAIL" />
               <TextInput
-                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
-                  fieldErrors.email
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}
+                className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${fieldErrors.email
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}
                 placeholder="nama@email.com"
                 placeholderTextColor="#a8a29e"
                 autoCapitalize="none"
@@ -477,11 +516,10 @@ export default function CreateUser() {
               {/* Password */}
               <FieldLabel text="PASSWORD" />
               <View
-                className={`mb-1 flex-row items-center rounded-xl border pr-3 ${
-                  fieldErrors.password
-                    ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
-                }`}>
+                className={`mb-1 flex-row items-center rounded-xl border pr-3 ${fieldErrors.password
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+                  }`}>
                 <TextInput
                   className="flex-1 px-4 py-3 text-sm text-stone-800 dark:text-stone-100"
                   placeholder="Minimal 8 karakter"

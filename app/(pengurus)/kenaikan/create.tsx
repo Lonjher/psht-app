@@ -288,31 +288,31 @@ export default function CreateKenaikan() {
     }
 
     setLoading(true);
-    try {
-      await api.post('/kenaikan', {
-        user_id: selectedUser,
-        tingkatan_id: selectedTingkatan,
-        tanggal_kenaikan: tanggal,
-        status,
-        nilai: {
-          tes_tulis: parseInt(nilai.tes_tulis) || 0,
-          tes_senam_jurus: parseInt(nilai.tes_senam_jurus) || 0,
-          tes_mental: parseInt(nilai.tes_mental) || 0,
-          kehadiran: parseInt(nilai.kehadiran) || 0,
-        },
-        catatan,
-      });
-      showAlert('success', 'Berhasil', 'Data kenaikan berhasil disimpan');
-      setTimeout(() => {
-        resetForm();
-        router.replace('/(pengurus)/kenaikan');
-      }, 1500);
-    } catch (e: any) {
-      showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        await api.post('/kenaikan', {
+          user_id: selectedUser,
+          tingkatan_id: selectedTingkatan,
+          tanggal_kenaikan: tanggal,
+          status,
+          nilai: {
+            tes_tulis: parseInt(nilai.tes_tulis) || 0,
+            tes_senam_jurus: parseInt(nilai.tes_senam_jurus) || 0,
+            tes_mental: parseInt(nilai.tes_mental) || 0,
+            kehadiran: parseInt(nilai.kehadiran) || 0,
+          },
+          catatan,
+        });
+        showAlert('success', 'Berhasil', 'Data kenaikan berhasil disimpan');
+        setTimeout(() => {
+          resetForm();
+          router.replace('/kenaikan');
+        }, 1500);
+      } catch (e: any) {
+        showAlert('error', 'Gagal', e.response?.data?.message ?? 'Terjadi kesalahan');
+      } finally {
+        setLoading(false);
+      }
+    };
 
   // Handler khusus untuk onValueChange
   const onValueChange = (event: any) => {
@@ -384,7 +384,7 @@ export default function CreateKenaikan() {
         {/* Header */}
         <View className="bg-stone-800 px-5 pb-8 pt-14 dark:bg-stone-900">
           <TouchableOpacity
-            onPress={() => router.replace('/(pengurus)/kenaikan')}
+            onPress={() => router.replace('/kenaikan')}
             className="mb-6 h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="chevron-back" size={18} color="#ffffff" />
           </TouchableOpacity>

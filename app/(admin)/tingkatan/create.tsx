@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,25 @@ export default function CreateTingkatan() {
   const hideAlert = () => {
     setAlertState((prev) => ({ ...prev, visible: false }));
   };
+
+  // Reset form function
+  const resetForm = useCallback(() => {
+    setForm({
+      nama_tingkatan: '',
+      urutan: '',
+      deskripsi: '',
+    });
+    setFieldErrors({});
+    setLoading(false);
+    setAlertState({ visible: false, variant: 'info', title: '', description: '' });
+  }, []);
+
+  // Reset form setiap kali halaman mendapat fokus
+  useFocusEffect(
+    useCallback(() => {
+      resetForm();
+    }, [resetForm])
+  );
 
   // Validasi per field
   const validateField = (field: keyof TingkatanForm, value: string): string | undefined => {
@@ -122,9 +141,7 @@ export default function CreateTingkatan() {
       showAlert('success', 'Berhasil', 'Tingkatan berhasil ditambahkan');
       
       setTimeout(() => {
-        setForm({ nama_tingkatan: '', urutan: '', deskripsi: '' });
-        setFieldErrors({});
-        
+        resetForm();
         router.replace('/tingkatan');
       }, 1500);
     } catch (e: any) {
