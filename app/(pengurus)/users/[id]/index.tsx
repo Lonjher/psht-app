@@ -45,6 +45,7 @@ export default function EditUser() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [alertState, setAlertState] = useState<AlertState>({
@@ -94,7 +95,6 @@ export default function EditUser() {
 
       // Helper untuk mendapatkan nama tingkatan (selalu string)
       const getTingkatanName = (): string => {
-        // Cek tingkatan_terakhir
         if (u.tingkatan_terakhir) {
           if (typeof u.tingkatan_terakhir === 'string') {
             return u.tingkatan_terakhir;
@@ -104,12 +104,10 @@ export default function EditUser() {
           }
         }
 
-        // Cek kenaikan_terakhir
         if (u.kenaikan_terakhir?.tingkatan?.nama_tingkatan) {
           return u.kenaikan_terakhir.tingkatan.nama_tingkatan;
         }
 
-        // Cek tingkatan langsung
         if (u.tingkatan?.nama_tingkatan) {
           return u.tingkatan.nama_tingkatan;
         }
@@ -140,8 +138,8 @@ export default function EditUser() {
   }, [id]);
 
   const handleUpdate = async () => {
-    if (isPending) {
-      showAlert('warning', 'Perhatian', 'Anggota harus disetujui terlebih dahulu.');
+    if (isPending || isNonaktif) {
+      showAlert('warning', 'Perhatian', 'Anggota harus aktif untuk dapat diubah.');
       return;
     }
 
@@ -175,7 +173,7 @@ export default function EditUser() {
           setApproving(true);
           try {
             await api.patch(`/users/${id}/approve`);
-            await fetchUser(); // ambil data terbaru, termasuk nomor_anggota
+            await fetchUser();
 
             hideAlert();
             showAlert('success', 'Disetujui', 'Anggota sekarang aktif dan nomor anggota telah dibuat');
@@ -191,9 +189,41 @@ export default function EditUser() {
     );
   };
 
+  const handleReject = () => {
+    showAlert(
+      'warning',
+      'Tolak Pendaftaran',
+      'Tolak pendaftaran anggota ini? Status akan diubah menjadi nonaktif.',
+      {
+        showCancel: true,
+        confirmText: 'Tolak',
+        cancelText: 'Batal',
+        onConfirm: async () => {
+          setRejecting(true);
+          try {
+            // Endpoint tolak; sesuaikan dengan API backend
+            await api.patch(`/users/${id}/reject`);
+
+            // Ambil data terbaru untuk mendapatkan status baru (nonaktif)
+            await fetchUser();
+
+            hideAlert();
+            showAlert('success', 'Ditolak', 'Pendaftaran anggota ditolak. Status menjadi nonaktif.');
+          } catch (e: any) {
+            console.error('Error rejecting:', e);
+            hideAlert();
+            showAlert('error', 'Gagal', e.response?.data?.message ?? 'Gagal menolak pendaftaran');
+          } finally {
+            setRejecting(false);
+          }
+        },
+      }
+    );
+  };
+
   const handleResetPassword = async () => {
-    if (isPending) {
-      showAlert('warning', 'Perhatian', 'Anggota harus disetujui terlebih dahulu.');
+    if (!isAktif) {
+      showAlert('warning', 'Perhatian', 'Hanya anggota aktif yang dapat direset passwordnya.');
       return;
     }
 
@@ -272,7 +302,7 @@ export default function EditUser() {
     );
   };
 
-  // Handler untuk DatePicker
+  // Handler untuk DatePicker (tetap menggunakan onChange karena lebih stabil)
   const onDateChange = (event: any, selectedDate?: Date) => {
     let dateToUse: Date | undefined;
 
@@ -308,8 +338,11 @@ export default function EditUser() {
       .join('')
       .toUpperCase();
 
+  // Status helper
   const isPending = form.status.toLowerCase() === 'pending';
   const isAktif = form.status.toLowerCase() === 'aktif';
+  // Asumsikan status nonaktif bisa 'nonaktif' atau 'ditolak'
+  const isNonaktif = form.status.toLowerCase() === 'nonaktif';
 
   if (loading) {
     return (
@@ -325,6 +358,7 @@ export default function EditUser() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+
         <ScrollView
           className="flex-1 bg-stone-50 dark:bg-stone-950"
           contentContainerClassName="flex-grow"
@@ -346,12 +380,23 @@ export default function EditUser() {
             <Text className="text-lg font-bold text-white">{form.name || 'Detail Anggota'}</Text>
             <Text className="mt-0.5 text-xs text-stone-300">{form.email}</Text>
 
+            {/* Badge status */}
             <View
-              className={`mt-3 rounded-full px-3 py-1 ${isAktif ? 'bg-emerald-500/20' : 'bg-amber-500/20'
-                }`}>
+              className={`mt-3 rounded-full px-3 py-1 ${
+                isAktif
+                  ? 'bg-emerald-500/20'
+                  : isPending
+                  ? 'bg-amber-500/20'
+                  : 'bg-red-500/20'
+              }`}>
               <Text
-                className={`text-xs font-semibold capitalize ${isAktif ? 'text-emerald-400' : 'text-amber-400'
-                  }`}>
+                className={`text-xs font-semibold capitalize ${
+                  isAktif
+                    ? 'text-emerald-400'
+                    : isPending
+                    ? 'text-amber-400'
+                    : 'text-red-400'
+                }`}>
                 {form.status}
               </Text>
             </View>
@@ -363,30 +408,75 @@ export default function EditUser() {
             </View>
           </View>
 
-          {/* Approve Banner */}
+          {/* Approve/Reject Banner untuk Pending */}
           {isPending && (
             <View className="px-5">
-              <View className="-mt-5 flex-row items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
-                <View className="h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
-                  <Ionicons name="time-outline" size={18} color="#b45309" />
+              <View className="-mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                    <Ionicons name="time-outline" size={18} color="#b45309" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-amber-800 dark:text-amber-400">
+                      Menunggu Persetujuan
+                    </Text>
+                    <Text className="mt-0.5 text-xs leading-4 text-amber-700/80 dark:text-amber-500/70">
+                      Setujui atau tolak pendaftaran anggota ini.
+                    </Text>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-amber-800 dark:text-amber-400">
-                    Menunggu Persetujuan
-                  </Text>
-                  <Text className="mt-0.5 text-xs leading-4 text-amber-700/80 dark:text-amber-500/70">
-                    Setujui agar anggota ini dapat mengakses akun
-                  </Text>
+
+                <View className="mt-3 flex-row gap-2">
+                  <TouchableOpacity
+                    onPress={handleApprove}
+                    disabled={approving || rejecting}
+                    className="flex-1 rounded-full bg-amber-700 px-3.5 py-2"
+                    activeOpacity={0.8}>
+                    <Text className="text-center text-xs font-semibold text-white">
+                      {approving ? 'Memproses...' : 'Setujui'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleReject}
+                    disabled={rejecting || approving}
+                    className="flex-1 rounded-full border border-red-300 bg-white px-3.5 py-2"
+                    activeOpacity={0.8}>
+                    <Text className="text-center text-xs font-semibold text-red-600">
+                      {rejecting ? 'Memproses...' : 'Tolak'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Banner untuk Nonaktif */}
+          {isNonaktif && (
+            <View className="px-5">
+              <View className="-mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/30">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40">
+                    <Ionicons name="close-circle-outline" size={18} color="#dc2626" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-red-800 dark:text-red-400">
+                      Akun Nonaktif
+                    </Text>
+                    <Text className="mt-0.5 text-xs leading-4 text-red-700/80 dark:text-red-500/70">
+                      Pendaftaran anggota ini telah ditolak.
+                    </Text>
+                  </View>
                 </View>
                 <TouchableOpacity
-                  onPress={handleApprove}
-                  disabled={approving}
-                  className="rounded-full bg-amber-700 px-3.5 py-2"
-                  activeOpacity={0.8}>
-                  <Text className="text-xs font-semibold text-white">
-                    {approving ? '...' : 'Setujui'}
-                  </Text>
-                </TouchableOpacity>
+                    onPress={handleApprove}
+                    disabled={approving || rejecting}
+                    className="mt-3 flex-1 rounded-full bg-amber-700 px-3.5 py-2"
+                    activeOpacity={0.8}>
+                    <Text className="text-center text-xs font-semibold text-white">
+                      {approving ? 'Memproses...' : 'Setujui'}
+                    </Text>
+                  </TouchableOpacity>
               </View>
             </View>
           )}
@@ -400,22 +490,28 @@ export default function EditUser() {
 
               <FieldLabel text="NAMA LENGKAP" />
               <TextInput
-                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
-                  }`}
+                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+                  isPending || isNonaktif
+                    ? 'bg-stone-200 dark:bg-stone-700'
+                    : 'bg-stone-50 dark:bg-stone-800'
+                }`}
                 value={form.name}
                 onChangeText={(t) => setForm({ ...form, name: t })}
-                editable={!isPending}
+                editable={!isPending && !isNonaktif}
               />
 
               <FieldLabel text="EMAIL" />
               <TextInput
-                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
-                  }`}
+                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+                  isPending || isNonaktif
+                    ? 'bg-stone-200 dark:bg-stone-700'
+                    : 'bg-stone-50 dark:bg-stone-800'
+                }`}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 value={form.email}
                 onChangeText={(t) => setForm({ ...form, email: t })}
-                editable={!isPending}
+                editable={!isPending && !isNonaktif}
               />
 
               <FieldLabel text="NOMOR ANGGOTA" />
@@ -428,27 +524,34 @@ export default function EditUser() {
 
               <FieldLabel text="NO HP" />
               <TextInput
-                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
-                  }`}
+                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+                  isPending || isNonaktif
+                    ? 'bg-stone-200 dark:bg-stone-700'
+                    : 'bg-stone-50 dark:bg-stone-800'
+                }`}
                 keyboardType="phone-pad"
                 maxLength={14}
                 value={form.no_hp}
                 onChangeText={(t) => setForm({ ...form, no_hp: t })}
-                editable={!isPending}
+                editable={!isPending && !isNonaktif}
               />
 
               <FieldLabel text="TANGGAL LAHIR" />
               <TouchableOpacity
-                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 dark:border-stone-700 ${isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
-                  }`}
+                className={`mb-4 rounded-xl border border-stone-200 px-4 py-3 dark:border-stone-700 ${
+                  isPending || isNonaktif
+                    ? 'bg-stone-200 dark:bg-stone-700'
+                    : 'bg-stone-50 dark:bg-stone-800'
+                }`}
                 onPress={() => {
-                  if (!isPending) setShowDatePicker(true);
+                  if (!isPending && !isNonaktif) setShowDatePicker(true);
                 }}
-                disabled={isPending}>
+                disabled={isPending || isNonaktif}>
                 <View className="flex-row items-center justify-between">
                   <Text
-                    className={`text-sm ${form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
-                      }`}>
+                    className={`text-sm ${
+                      form.tanggal_lahir ? 'text-stone-800 dark:text-stone-100' : 'text-stone-400'
+                    }`}>
                     {form.tanggal_lahir || 'Pilih tanggal lahir'}
                   </Text>
                   <Ionicons
@@ -459,7 +562,7 @@ export default function EditUser() {
                 </View>
               </TouchableOpacity>
 
-              {showDatePicker && (
+              {showDatePicker && !isPending && !isNonaktif && (
                 <View>
                   <DateTimePicker
                     value={
@@ -485,77 +588,84 @@ export default function EditUser() {
 
               <FieldLabel text="ALAMAT" />
               <TextInput
-                className={`mb-5 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${isPending ? 'bg-stone-200 dark:bg-stone-700' : 'bg-stone-50 dark:bg-stone-800'
-                  }`}
+                className={`mb-5 rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-800 dark:border-stone-700 dark:text-stone-100 ${
+                  isPending || isNonaktif
+                    ? 'bg-stone-200 dark:bg-stone-700'
+                    : 'bg-stone-50 dark:bg-stone-800'
+                }`}
                 multiline
                 numberOfLines={2}
                 textAlignVertical="top"
                 style={{ minHeight: 60 }}
                 value={form.alamat}
                 onChangeText={(t) => setForm({ ...form, alamat: t })}
-                editable={!isPending}
+                editable={!isPending && !isNonaktif}
               />
 
               <Button
                 className="w-full bg-amber-700 active:opacity-90"
                 size="lg"
                 onPress={handleUpdate}
-                disabled={saving || isPending}>
+                disabled={saving || isPending || isNonaktif}>
                 <Text className="font-semibold text-white">
                   {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </Text>
               </Button>
             </View>
 
-            {/* Reset Password Section */}
-            <View className="mt-5 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/40 dark:bg-blue-950/20">
-              <View className="mb-3 flex-row items-center gap-2">
-                <Ionicons name="key-outline" size={16} color="#2563eb" />
-                <Text className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                  Reset Password
-                </Text>
-              </View>
-              <Text className="mb-4 text-xs leading-5 text-blue-500/80 dark:text-blue-400/70">
-                Password akan direset ke tanggal lahir dengan format DDMMYYYY.
-                {form.tanggal_lahir && (
-                  <Text className="font-semibold">
-                    {'\n'}Password default: {form.tanggal_lahir.split('-').reverse().join('')}
+            {/* Reset Password Section - hanya tampil untuk anggota aktif */}
+            {isAktif && (
+              <View className="mt-5 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/40 dark:bg-blue-950/20">
+                <View className="mb-3 flex-row items-center gap-2">
+                  <Ionicons name="key-outline" size={16} color="#2563eb" />
+                  <Text className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    Reset Password
                   </Text>
-                )}
-              </Text>
-              <TouchableOpacity
-                className="flex-row items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-3.5 dark:border-blue-900/50 dark:bg-stone-900"
-                onPress={handleResetPassword}
-                disabled={resettingPassword || isPending || !form.tanggal_lahir}
-                activeOpacity={0.7}>
-                <Ionicons name="key-outline" size={16} color="#2563eb" />
-                <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  {resettingPassword ? 'Mereset...' : 'Reset Password'}
+                </View>
+                <Text className="mb-4 text-xs leading-5 text-blue-500/80 dark:text-blue-400/70">
+                  Password akan direset ke tanggal lahir dengan format DDMMYYYY.
+                  {form.tanggal_lahir && (
+                    <Text className="font-semibold">
+                      {'\n'}Password default: {form.tanggal_lahir.split('-').reverse().join('')}
+                    </Text>
+                  )}
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Danger Zone */}
-            <View className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-5 dark:border-red-900/40 dark:bg-red-950/20">
-              <View className="mb-3 flex-row items-center gap-2">
-                <Ionicons name="warning-outline" size={16} color="#dc2626" />
-                <Text className="text-sm font-bold text-red-600 dark:text-red-400">Zona Berbahaya</Text>
+                <TouchableOpacity
+                  className="flex-row items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white py-3.5 dark:border-blue-900/50 dark:bg-stone-900"
+                  onPress={handleResetPassword}
+                  disabled={resettingPassword || !form.tanggal_lahir}
+                  activeOpacity={0.7}>
+                  <Ionicons name="key-outline" size={16} color="#2563eb" />
+                  <Text className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    {resettingPassword ? 'Mereset...' : 'Reset Password'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
-                Menghapus anggota akan menghilangkan seluruh riwayat keanggotaan secara permanen.
-              </Text>
+            )}
 
-              <TouchableOpacity
-                className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
-                onPress={handleDelete}
-                disabled={deleting}
-                activeOpacity={0.7}>
-                <Ionicons name="trash-outline" size={16} color="#dc2626" />
-                <Text className="text-sm font-semibold text-red-600 dark:text-red-400">
-                  {deleting ? 'Menghapus...' : 'Hapus Anggota'}
+            {/* Danger Zone - hanya tampil untuk anggota aktif */}
+            {isAktif && (
+              <View className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-5 dark:border-red-900/40 dark:bg-red-950/20">
+                <View className="mb-3 flex-row items-center gap-2">
+                  <Ionicons name="warning-outline" size={16} color="#dc2626" />
+                  <Text className="text-sm font-bold text-red-600 dark:text-red-400">Zona Berbahaya</Text>
+                </View>
+                <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
+                  Menghapus anggota akan menghilangkan seluruh riwayat keanggotaan secara permanen.
                 </Text>
-              </TouchableOpacity>
-            </View>
+
+                <TouchableOpacity
+                  className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
+                  onPress={handleDelete}
+                  disabled={deleting}
+                  activeOpacity={0.7}>
+                  <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                  <Text className="text-sm font-semibold text-red-600 dark:text-red-400">
+                    {deleting ? 'Menghapus...' : 'Hapus Anggota'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View className="h-8" />
           </View>

@@ -128,6 +128,8 @@ export default function ListUsers() {
         }
         renderItem={({ item }) => {
           const isAktif = item.status.toLowerCase() === 'aktif';
+          const isPending = item.status.toLowerCase() === 'pending';
+          const isNonaktif = item.status.toLowerCase() === 'nonaktif';
           return (
             <TouchableOpacity
               className="mb-3 flex-row items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:shadow-none"
@@ -152,20 +154,24 @@ export default function ListUsers() {
               </View>
 
               <View
-                className={`rounded-full px-2.5 py-1 ${
-                  isAktif
-                    ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                    : 'bg-amber-100 dark:bg-amber-900/30'
-                }`}>
-                <Text
-                  className={`text-[10px] font-semibold capitalize ${
+                  className={`rounded-full px-2.5 py-1 ${
                     isAktif
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-amber-700 dark:text-amber-500'
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                      : isPending
+                      ? 'bg-amber-100 dark:bg-amber-900/30'
+                      : 'bg-red-100 dark:bg-red-900/30' // nonaktif atau fallback
                   }`}>
-                  {item.status}
-                </Text>
-              </View>
+                  <Text
+                    className={`text-[10px] font-semibold capitalize ${
+                      isAktif
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : isPending
+                        ? 'text-amber-700 dark:text-amber-500'
+                        : 'text-red-700 dark:text-red-400' // nonaktif atau fallback
+                    }`}>
+                    {item.status}
+                  </Text>
+                </View>
             </TouchableOpacity>
           );
         }}

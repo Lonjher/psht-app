@@ -568,22 +568,22 @@ export default function CreateKenaikan() {
 
             <View className="-mx-1.5 flex-row flex-wrap">
               <NilaiInput
-                label="Tes Tulis"
+                label="Tes Tulis (25%)"
                 value={nilai.tes_tulis}
                 onChangeText={(t) => setNilai({ ...nilai, tes_tulis: t })}
               />
               <NilaiInput
-                label="Senam & Jurus"
+                label="Senam & Jurus (25%)"
                 value={nilai.tes_senam_jurus}
                 onChangeText={(t) => setNilai({ ...nilai, tes_senam_jurus: t })}
               />
               <NilaiInput
-                label="Mental"
+                label="Mental (25%)"
                 value={nilai.tes_mental}
                 onChangeText={(t) => setNilai({ ...nilai, tes_mental: t })}
               />
               <NilaiInput
-                label="Kehadiran"
+                label="Kehadiran (25%)"
                 value={nilai.kehadiran}
                 onChangeText={(t) => setNilai({ ...nilai, kehadiran: t })}
               />
@@ -651,7 +651,8 @@ function NilaiInput({
       <TextInput
         className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
         keyboardType="numeric"
-        placeholder="0"
+        maxLength={2}
+        placeholder="0 - 99"
         placeholderTextColor="#a8a29e"
         value={value}
         onChangeText={onChangeText}
