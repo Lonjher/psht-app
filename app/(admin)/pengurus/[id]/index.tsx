@@ -166,7 +166,7 @@ export default function EditPengurus() {
         onConfirm: async () => {
           setResettingPassword(true);
           try {
-            await api.patch(`/pengurus/${id}/reset-password`, {
+            await api.patch(`/users/${id}/reset-password`, {
               password: defaultPassword,
             });
 

@@ -10,6 +10,7 @@ import {
   Platform,
   useColorScheme,
   KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,14 +41,23 @@ export default function EditUser() {
     tanggal_lahir: '',
     status: '',
     tingkatan_terakhir: '',
+    alasan_penolakan: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+
+  // State untuk Modal Reject/Deactivate
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
+  const [rejectMode, setRejectMode] = useState<'reject' | 'deactivate'>('reject');
+
   const [alertState, setAlertState] = useState<AlertState>({
     visible: false,
     variant: 'info',
@@ -89,11 +99,8 @@ export default function EditUser() {
       const u = res.data;
 
       console.log('User data dari backend:', JSON.stringify(u, null, 2));
-      console.log('tingkatan_terakhir:', u.tingkatan_terakhir);
-      console.log('kenaikan_terakhir:', u.kenaikan_terakhir);
-      console.log('tingkatan:', u.tingkatan);
+      console.log('alasan_penolakan:', u.alasan_penolakan);
 
-      // Helper untuk mendapatkan nama tingkatan (selalu string)
       const getTingkatanName = (): string => {
         if (u.tingkatan_terakhir) {
           if (typeof u.tingkatan_terakhir === 'string') {
@@ -103,15 +110,12 @@ export default function EditUser() {
             return u.tingkatan_terakhir.nama_tingkatan;
           }
         }
-
         if (u.kenaikan_terakhir?.tingkatan?.nama_tingkatan) {
           return u.kenaikan_terakhir.tingkatan.nama_tingkatan;
         }
-
         if (u.tingkatan?.nama_tingkatan) {
           return u.tingkatan.nama_tingkatan;
         }
-
         return 'Belum ada tingkatan';
       };
 
@@ -124,6 +128,7 @@ export default function EditUser() {
         tanggal_lahir: u.tanggal_lahir ?? '',
         status: u.status ?? 'pending',
         tingkatan_terakhir: getTingkatanName(),
+        alasan_penolakan: u.alasan_penolakan ?? '',
       });
     } catch (e) {
       console.error('Error fetching user:', e);
@@ -146,9 +151,7 @@ export default function EditUser() {
     setSaving(true);
     try {
       await api.put(`/users/${id}`, form);
-
       showAlert('success', 'Berhasil', 'Data anggota berhasil diperbarui');
-
       setTimeout(() => {
         router.replace('/users');
       }, 1500);
@@ -189,36 +192,67 @@ export default function EditUser() {
     );
   };
 
+  // Buka modal reject (untuk pending)
   const handleReject = () => {
-    showAlert(
-      'warning',
-      'Tolak Pendaftaran',
-      'Tolak pendaftaran anggota ini? Status akan diubah menjadi nonaktif.',
-      {
-        showCancel: true,
-        confirmText: 'Tolak',
-        cancelText: 'Batal',
-        onConfirm: async () => {
-          setRejecting(true);
-          try {
-            // Endpoint tolak; sesuaikan dengan API backend
-            await api.patch(`/users/${id}/reject`);
+    setRejectMode('reject');
+    setRejectReason('');
+    setRejectError('');
+    setRejectModalVisible(true);
+  };
 
-            // Ambil data terbaru untuk mendapatkan status baru (nonaktif)
-            await fetchUser();
+  // Buka modal deactivate (untuk aktif)
+  // const handleDeactivate = () => {
+  //   setRejectMode('deactivate');
+  //   setRejectReason('');
+  //   setRejectError('');
+  //   setRejectModalVisible(true);
+  // };
 
-            hideAlert();
-            showAlert('success', 'Ditolak', 'Pendaftaran anggota ditolak. Status menjadi nonaktif.');
-          } catch (e: any) {
-            console.error('Error rejecting:', e);
-            hideAlert();
-            showAlert('error', 'Gagal', e.response?.data?.message ?? 'Gagal menolak pendaftaran');
-          } finally {
-            setRejecting(false);
-          }
-        },
-      }
-    );
+  // Submit reject / deactivate dengan alasan
+  const submitReject = async () => {
+    // Validasi
+    if (!rejectReason.trim()) {
+      setRejectError('Alasan wajib diisi');
+      return;
+    }
+
+    if (rejectReason.trim().length < 10) {
+      setRejectError('Alasan minimal 10 karakter');
+      return;
+    }
+
+    if (rejectReason.trim().length > 500) {
+      setRejectError('Alasan maksimal 500 karakter');
+      return;
+    }
+
+    if (rejectMode === 'reject') {
+      setRejecting(true);
+    } else {
+      setDeactivating(true);
+    }
+
+    try {
+      await api.patch(`/users/${id}/reject`, {
+        alasan_penolakan: rejectReason.trim(),
+      });
+
+      await fetchUser();
+      setRejectModalVisible(false);
+
+      const successMessage =
+        rejectMode === 'reject'
+          ? 'Pendaftaran anggota ditolak. Status menjadi nonaktif.'
+          : 'Anggota berhasil dinonaktifkan.';
+
+      showAlert('success', 'Berhasil', successMessage);
+    } catch (e: any) {
+      console.error('Error:', e);
+      setRejectError(e.response?.data?.message ?? 'Terjadi kesalahan');
+    } finally {
+      setRejecting(false);
+      setDeactivating(false);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -302,7 +336,6 @@ export default function EditUser() {
     );
   };
 
-  // Handler untuk DatePicker (tetap menggunakan onChange karena lebih stabil)
   const onDateChange = (event: any, selectedDate?: Date) => {
     let dateToUse: Date | undefined;
 
@@ -338,10 +371,8 @@ export default function EditUser() {
       .join('')
       .toUpperCase();
 
-  // Status helper
   const isPending = form.status.toLowerCase() === 'pending';
   const isAktif = form.status.toLowerCase() === 'aktif';
-  // Asumsikan status nonaktif bisa 'nonaktif' atau 'ditolak'
   const isNonaktif = form.status.toLowerCase() === 'nonaktif';
 
   if (loading) {
@@ -358,7 +389,6 @@ export default function EditUser() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
-
         <ScrollView
           className="flex-1 bg-stone-50 dark:bg-stone-950"
           contentContainerClassName="flex-grow"
@@ -380,7 +410,6 @@ export default function EditUser() {
             <Text className="text-lg font-bold text-white">{form.name || 'Detail Anggota'}</Text>
             <Text className="mt-0.5 text-xs text-stone-300">{form.email}</Text>
 
-            {/* Badge status */}
             <View
               className={`mt-3 rounded-full px-3 py-1 ${
                 isAktif
@@ -408,7 +437,7 @@ export default function EditUser() {
             </View>
           </View>
 
-          {/* Approve/Reject Banner untuk Pending */}
+          {/* Banner Pending */}
           {isPending && (
             <View className="px-5">
               <View className="-mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
@@ -451,7 +480,7 @@ export default function EditUser() {
             </View>
           )}
 
-          {/* Banner untuk Nonaktif */}
+          {/* Banner Nonaktif - Menampilkan Alasan */}
           {isNonaktif && (
             <View className="px-5">
               <View className="-mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/30">
@@ -468,15 +497,28 @@ export default function EditUser() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                    onPress={handleApprove}
-                    disabled={approving || rejecting}
-                    className="mt-3 flex-1 rounded-full bg-amber-700 px-3.5 py-2"
-                    activeOpacity={0.8}>
-                    <Text className="text-center text-xs font-semibold text-white">
-                      {approving ? 'Memproses...' : 'Setujui'}
+
+                <View className="mt-3 rounded-xl bg-white/70 p-3 dark:bg-stone-900/50">
+                  <View className="mb-1.5 flex-row items-center gap-1.5">
+                    <Ionicons name="information-circle-outline" size={12} color="#dc2626" />
+                    <Text className="text-[10px] font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">
+                      Alasan Penolakan
                     </Text>
-                  </TouchableOpacity>
+                  </View>
+                  <Text className="text-xs leading-5 text-red-800 dark:text-red-300">
+                    {form.alasan_penolakan || 'Alasan tidak tersedia.'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleApprove}
+                  disabled={approving || rejecting}
+                  className="mt-3 rounded-full bg-amber-700 px-3.5 py-2"
+                  activeOpacity={0.8}>
+                  <Text className="text-center text-xs font-semibold text-white">
+                    {approving ? 'Memproses...' : 'Setujui dan Aktifkan'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -613,7 +655,7 @@ export default function EditUser() {
               </Button>
             </View>
 
-            {/* Reset Password Section - hanya tampil untuk anggota aktif */}
+            {/* Reset Password Section */}
             {isAktif && (
               <View className="mt-5 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900/40 dark:bg-blue-950/20">
                 <View className="mb-3 flex-row items-center gap-2">
@@ -643,7 +685,7 @@ export default function EditUser() {
               </View>
             )}
 
-            {/* Danger Zone - hanya tampil untuk anggota aktif */}
+            {/* Danger Zone */}
             {isAktif && (
               <View className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-5 dark:border-red-900/40 dark:bg-red-950/20">
                 <View className="mb-3 flex-row items-center gap-2">
@@ -651,9 +693,22 @@ export default function EditUser() {
                   <Text className="text-sm font-bold text-red-600 dark:text-red-400">Zona Berbahaya</Text>
                 </View>
                 <Text className="mb-4 text-xs leading-5 text-red-500/80 dark:text-red-400/70">
-                  Menghapus anggota akan menghilangkan seluruh riwayat keanggotaan secara permanen.
+                  Menonaktifkan atau menghapus anggota akan berdampak pada akses akun anggota ini.
                 </Text>
 
+                {/* Tombol Nonaktifkan */}
+                {/* <TouchableOpacity
+                  className="mb-3 flex-row items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white py-3.5 dark:border-amber-900/50 dark:bg-stone-900"
+                  onPress={handleDeactivate}
+                  disabled={deactivating}
+                  activeOpacity={0.7}>
+                  <Ionicons name="pause-circle-outline" size={16} color="#d97706" />
+                  <Text className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                    {deactivating ? 'Memproses...' : 'Nonaktifkan Anggota'}
+                  </Text>
+                </TouchableOpacity> */}
+
+                {/* Tombol Hapus */}
                 <TouchableOpacity
                   className="flex-row items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3.5 dark:border-red-900/50 dark:bg-stone-900"
                   onPress={handleDelete}
@@ -671,6 +726,108 @@ export default function EditUser() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal Input Alasan (Reject / Deactivate) */}
+      <Modal
+        visible={rejectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !rejecting && !deactivating && setRejectModalVisible(false)}>
+        <View className="flex-1 items-center justify-center bg-black/50 px-5">
+          <View className="w-full rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
+            {/* Header Modal */}
+            <View className="mb-4 flex-row items-center gap-3">
+              <View
+                className={`h-10 w-10 items-center justify-center rounded-full ${
+                  rejectMode === 'reject'
+                    ? 'bg-red-100 dark:bg-red-900/30'
+                    : 'bg-amber-100 dark:bg-amber-900/30'
+                }`}>
+                <Ionicons
+                  name={rejectMode === 'reject' ? 'close-circle-outline' : 'pause-circle-outline'}
+                  size={20}
+                  color={rejectMode === 'reject' ? '#dc2626' : '#d97706'}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-stone-800 dark:text-stone-100">
+                  {rejectMode === 'reject' ? 'Tolak Pendaftaran' : 'Nonaktifkan Anggota'}
+                </Text>
+                <Text className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                  {rejectMode === 'reject'
+                    ? 'Berikan alasan penolakan'
+                    : 'Berikan alasan menonaktifkan anggota'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Input Alasan */}
+            <Text className="mb-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
+              {rejectMode === 'reject' ? 'ALASAN PENOLAKAN' : 'ALASAN NONAKTIF'}
+            </Text>
+            <TextInput
+              className={`mb-1 rounded-xl border px-4 py-3 text-sm text-stone-800 dark:text-stone-100 ${
+                rejectError
+                  ? 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-950/30'
+                  : 'border-stone-200 bg-stone-50 dark:border-stone-700 dark:bg-stone-800'
+              }`}
+              placeholder={
+                rejectMode === 'reject'
+                  ? 'Contoh: Data tidak lengkap, alamat tidak valid, dll.'
+                  : 'Contoh: Melanggar aturan, tidak aktif latihan, dll.'
+              }
+              placeholderTextColor="#a8a29e"
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              style={{ minHeight: 80 }}
+              value={rejectReason}
+              onChangeText={(t) => {
+                setRejectReason(t);
+                if (rejectError) setRejectError('');
+              }}
+              maxLength={500}
+              editable={!rejecting && !deactivating}
+            />
+
+            {rejectError ? (
+              <Text className="mb-4 text-xs text-red-600 dark:text-red-400">{rejectError}</Text>
+            ) : (
+              <Text className="mb-4 text-right text-[10px] text-stone-400 dark:text-stone-600">
+                {rejectReason.length}/500
+              </Text>
+            )}
+
+            {/* Tombol Aksi */}
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 items-center justify-center rounded-xl border border-stone-200 bg-stone-50 py-3.5 dark:border-stone-700 dark:bg-stone-800"
+                onPress={() => setRejectModalVisible(false)}
+                disabled={rejecting || deactivating}
+                activeOpacity={0.7}>
+                <Text className="text-sm font-semibold text-stone-600 dark:text-stone-300">
+                  Batal
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className={`flex-1 items-center justify-center rounded-xl py-3.5 active:opacity-90 ${
+                  rejectMode === 'reject' ? 'bg-red-600' : 'bg-amber-600'
+                }`}
+                onPress={submitReject}
+                disabled={rejecting || deactivating}
+                activeOpacity={0.7}>
+                <Text className="text-sm font-semibold text-white">
+                  {rejecting || deactivating
+                    ? 'Memproses...'
+                    : rejectMode === 'reject'
+                    ? 'Tolak'
+                    : 'Nonaktifkan'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Alert Modal */}
       <Alert
